@@ -195,14 +195,14 @@ const ConfigurePage = () => {
 
           {/* Start Button */}
           <div className="start-button-wrapper">
-            <button
-              onClick={handleStart}
-              disabled={!isComplete}
-              className={`start-button ${isComplete ? 'enabled' : 'disabled'}`}
-            >
-              <span>Start Interview</span>
-              <FastForward className="w-5 h-5" fill="currentColor" />
-            </button>
+          <button
+            onClick={handleStart}
+            disabled={!isComplete}
+            className={`start-button ${isComplete ? 'enabled' : 'disabled'}`}
+          >
+            <span>Start Interview</span>
+            <FastForward className="w-5 h-5" fill="currentColor" />
+          </button>
           </div>
         </div>
       </div>
