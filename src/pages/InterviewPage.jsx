@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { X, Mic } from 'lucide-react';
+import { X, Mic, Play } from 'lucide-react';
 import interviewVideo from '../assets/AI_Job_Interviewer_Video_Generation.mp4';
 
 const InterviewPage = () => {
@@ -9,6 +9,8 @@ const InterviewPage = () => {
   const videoRef = useRef(null);
   const userVideoRef = useRef(null);
   const recognitionRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
   
   const config = location.state?.config || {};
   // Parse duration from config (e.g., "30 minutes" -> 30)
@@ -29,6 +31,9 @@ const InterviewPage = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [answer, setAnswer] = useState('');
   const [answers, setAnswers] = useState([]);
+  const [audioRecordings, setAudioRecordings] = useState([]); // Array of audio blobs
+  const [showSummary, setShowSummary] = useState(false);
+  const [userStream, setUserStream] = useState(null);
 
   const currentQuestion = questions[currentQuestionIndex];
 
@@ -40,6 +45,7 @@ const InterviewPage = () => {
           video: true, 
           audio: true 
         });
+        setUserStream(stream);
         if (userVideoRef.current) {
           userVideoRef.current.srcObject = stream;
         }
@@ -52,12 +58,22 @@ const InterviewPage = () => {
 
     // Cleanup: stop all tracks when component unmounts
     return () => {
-      if (userVideoRef.current && userVideoRef.current.srcObject) {
-        const tracks = userVideoRef.current.srcObject.getTracks();
-        tracks.forEach(track => track.stop());
-      }
+      stopAllTracks();
     };
   }, []);
+
+  // Stop all media tracks
+  const stopAllTracks = () => {
+    if (userStream) {
+      userStream.getTracks().forEach(track => track.stop());
+      setUserStream(null);
+    }
+    if (userVideoRef.current && userVideoRef.current.srcObject) {
+      const tracks = userVideoRef.current.srcObject.getTracks();
+      tracks.forEach(track => track.stop());
+      userVideoRef.current.srcObject = null;
+    }
+  };
 
   // Initialize Speech Recognition
   useEffect(() => {
@@ -68,6 +84,8 @@ const InterviewPage = () => {
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-US';
+
+      let finalTranscriptAccumulator = '';
 
       recognitionRef.current.onresult = (event) => {
         let interimTranscript = '';
@@ -82,10 +100,16 @@ const InterviewPage = () => {
           }
         }
 
-        setAnswer(prev => {
-          const newAnswer = prev + finalTranscript;
-          return newAnswer + interimTranscript;
-        });
+        // Accumulate final transcripts
+        finalTranscriptAccumulator += finalTranscript;
+
+        // Display: accumulated final + current interim
+        setAnswer(finalTranscriptAccumulator + interimTranscript);
+      };
+
+      recognitionRef.current.onend = () => {
+        // Reset accumulator when recognition ends
+        finalTranscriptAccumulator = '';
       };
 
       recognitionRef.current.onerror = (event) => {
@@ -102,29 +126,78 @@ const InterviewPage = () => {
     };
   }, []);
 
-  // Handle finish interview function
-  const handleFinishInterview = () => {
-    // Stop recognition if active
-    if (recognitionRef.current && isRecording) {
-      recognitionRef.current.stop();
-    }
+  // Text-to-speech for questions
+  useEffect(() => {
+    if (currentQuestion && 'speechSynthesis' in window && videoRef.current) {
+      const speakQuestion = () => {
+        // Get available voices and select a female voice
+        const voices = window.speechSynthesis.getVoices();
+        const femaleVoice = voices.find(voice => 
+          voice.name.toLowerCase().includes('female') || 
+          voice.name.toLowerCase().includes('zira') ||
+          voice.name.toLowerCase().includes('samantha') ||
+          voice.name.toLowerCase().includes('susan') ||
+          voice.name.toLowerCase().includes('karen') ||
+          voice.name.toLowerCase().includes('hazel') ||
+          (voice.lang.startsWith('en') && voice.name.includes('Female'))
+        ) || voices.find(voice => voice.lang.startsWith('en-US') && voice.gender === 'female') 
+          || voices.find(voice => voice.lang.startsWith('en'));
 
-    // Save final answer if recording
-    if (isRecording && answer) {
-      const currentAnswers = [...answers];
-      currentAnswers[currentQuestionIndex] = answer;
-      setAnswers(currentAnswers);
-    }
+        const utterance = new SpeechSynthesisUtterance(currentQuestion);
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        utterance.volume = 1;
+        
+        if (femaleVoice) {
+          utterance.voice = femaleVoice;
+        }
+        
+        // Start playing video when speech starts
+        utterance.onstart = () => {
+          if (videoRef.current) {
+            videoRef.current.currentTime = 0; // Reset to beginning
+            videoRef.current.play();
+          }
+        };
+        
+        // Stop/pause video when speech ends
+        utterance.onend = () => {
+          if (videoRef.current) {
+            videoRef.current.pause();
+          }
+        };
+        
+        utterance.onerror = () => {
+          if (videoRef.current) {
+            videoRef.current.pause();
+          }
+        };
+        
+        // Cancel any ongoing speech
+        window.speechSynthesis.cancel();
+        
+        // Speak the question
+        window.speechSynthesis.speak(utterance);
+      };
 
-    // Navigate to feedback page
-    navigate('/feedback', {
-      state: {
-        config,
-        answers: answers,
-        timeSpent: (totalDuration * 60) - timeRemaining
+      // Load voices if not already loaded
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length === 0) {
+        window.speechSynthesis.onvoiceschanged = speakQuestion;
+      } else {
+        speakQuestion();
       }
-    });
-  };
+    }
+
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      if (videoRef.current) {
+        videoRef.current.pause();
+      }
+    };
+  }, [currentQuestion]);
 
   // Countdown timer effect
   useEffect(() => {
@@ -143,7 +216,7 @@ const InterviewPage = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [timeRemaining, totalDuration]);
+  }, [timeRemaining]);
 
   // Format time as MM:SS (for countdown)
   const formatTime = (seconds) => {
@@ -154,41 +227,101 @@ const InterviewPage = () => {
 
   const handleExit = () => {
     if (window.confirm('Are you sure you want to exit the interview?')) {
+      // Stop all media tracks
+      stopAllTracks();
+      
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
+      
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      
       navigate('/');
     }
   };
 
-  const handleStartAnswer = () => {
+  const handleStartAnswer = async () => {
     setIsRecording(true);
-    setAnswer('');
+    // Start with saved answer if exists, otherwise empty
+    setAnswer(answers[currentQuestionIndex] || '');
+    audioChunksRef.current = [];
     
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.start();
-      } catch (error) {
-        console.error('Error starting speech recognition:', error);
+    try {
+      // Start MediaRecorder for audio recording
+      if (userStream) {
+        const mediaRecorder = new MediaRecorder(userStream, {
+          mimeType: 'audio/webm;codecs=opus'
+        });
+        
+        mediaRecorderRef.current = mediaRecorder;
+        
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+        
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const audioUrl = URL.createObjectURL(audioBlob);
+          
+          // Store audio recording
+          const currentRecordings = [...audioRecordings];
+          currentRecordings[currentQuestionIndex] = audioUrl;
+          setAudioRecordings(currentRecordings);
+        };
+        
+        mediaRecorder.start();
       }
+      
+      // Start Speech Recognition
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.start();
+        } catch (error) {
+          console.error('Error starting speech recognition:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      setIsRecording(false);
     }
   };
 
   const handleStopAnswer = () => {
     setIsRecording(false);
     
+    // Stop Speech Recognition
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
+    
+    // Stop MediaRecorder
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
 
-    // Save current answer
-    const currentAnswers = [...answers];
-    currentAnswers[currentQuestionIndex] = answer;
-    setAnswers(currentAnswers);
-    setAnswer('');
+    // Save current answer transcript (remove any interim results)
+    if (answer) {
+      const currentAnswers = [...answers];
+      // Store only the final answer (without interim results)
+      currentAnswers[currentQuestionIndex] = answer.replace(/undefined/g, '').trim();
+      setAnswers(currentAnswers);
+    }
   };
 
   const handleNextQuestion = () => {
+    // Make sure recording is stopped
+    if (isRecording) {
+      handleStopAnswer();
+    }
+    
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setAnswer(''); // Clear answer for next question
@@ -196,6 +329,100 @@ const InterviewPage = () => {
       handleFinishInterview();
     }
   };
+
+  const handleFinishInterview = () => {
+    // Stop recognition if active
+    if (recognitionRef.current && isRecording) {
+      recognitionRef.current.stop();
+    }
+    
+    // Stop recording if active
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+
+    // Save final answer if recording
+    if (isRecording && answer) {
+      const currentAnswers = [...answers];
+      currentAnswers[currentQuestionIndex] = answer;
+      setAnswers(currentAnswers);
+    }
+
+    // Stop all media tracks
+    stopAllTracks();
+
+    // Show summary screen
+    setShowSummary(true);
+  };
+
+  const handlePlayAudio = (audioUrl, event) => {
+    event.stopPropagation();
+    const audio = new Audio(audioUrl);
+    audio.play();
+  };
+
+  // Summary Screen
+  if (showSummary) {
+    return (
+      <div className="min-h-screen bg-[#060010] text-white p-8">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-4xl font-bold mb-8 text-center">Interview Summary</h1>
+          
+          <div className="space-y-6">
+            {questions.map((question, index) => (
+              <div key={index} className="bg-black/40 backdrop-blur-sm rounded-lg p-6 border border-white/10">
+                <div className="flex items-start justify-between mb-4">
+                  <h3 className="text-red-500 font-semibold text-lg mb-2">
+                    Question {index + 1}
+                  </h3>
+                  {audioRecordings[index] && (
+                    <button
+                      onClick={(e) => handlePlayAudio(audioRecordings[index], e)}
+                      className="play-audio-button"
+                    >
+                      <Play className="w-5 h-5" />
+                      <span>Play Audio</span>
+                    </button>
+                  )}
+                </div>
+                <p className="text-gray-300 mb-4">{question}</p>
+                
+                {answers[index] ? (
+                  <div className="bg-white/5 rounded-lg p-4">
+                    <p className="text-white">{answers[index]}</p>
+                  </div>
+                ) : (
+                  <p className="text-gray-500 italic">No answer recorded</p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 flex justify-center gap-4">
+            <button
+              onClick={() => navigate('/feedback', {
+                state: {
+                  config,
+                  answers: answers,
+                  audioRecordings: audioRecordings,
+                  timeSpent: (totalDuration * 60) - timeRemaining
+                }
+              })}
+              className="finish-interview-button"
+            >
+              View Feedback →
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="next-question-button"
+            >
+              Back to Home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-screen bg-[#060010] overflow-hidden flex flex-col">
@@ -222,8 +449,6 @@ const InterviewPage = () => {
         <div className="flex-1 flex items-center justify-center">
           <video
             ref={videoRef}
-            autoPlay
-            loop
             muted
             playsInline
             className="interview-video-split"
@@ -270,7 +495,7 @@ const InterviewPage = () => {
         <div className="question-container">
           <div className="flex items-center justify-between mb-4">
             <h3 className="question-heading">Question {currentQuestionIndex + 1} of {questions.length}</h3>
-            {!isRecording && answer && currentQuestionIndex < questions.length - 1 && (
+            {!isRecording && (answer || answers[currentQuestionIndex]) && currentQuestionIndex < questions.length - 1 && (
               <button
                 onClick={handleNextQuestion}
                 className="next-question-button"
@@ -278,7 +503,7 @@ const InterviewPage = () => {
                 Next Question →
               </button>
             )}
-            {!isRecording && currentQuestionIndex === questions.length - 1 && answers.length === questions.length && (
+            {!isRecording && currentQuestionIndex === questions.length - 1 && (
               <button
                 onClick={handleFinishInterview}
                 className="finish-interview-button"
@@ -293,11 +518,16 @@ const InterviewPage = () => {
               {answer}
             </div>
           )}
-          {!answer && !isRecording && (
+          {!answer && !isRecording && !answers[currentQuestionIndex] && (
             <p className="answer-placeholder">your answer appear here</p>
           )}
           {isRecording && !answer && (
             <p className="answer-placeholder">Listening... Speak your answer</p>
+          )}
+          {!isRecording && answers[currentQuestionIndex] && !answer && (
+            <div className="answer-text">
+              {answers[currentQuestionIndex]}
+            </div>
           )}
         </div>
       </div>
