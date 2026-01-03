@@ -1,56 +1,70 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Send, Clock, AlertCircle, Mic, MicOff, Volume2, X, LogOut } from 'lucide-react';
-import interviewerVideo from '../assets/AI_Job_Interviewer_Video_Generation.mp4';
+import { X, Mic } from 'lucide-react';
+import interviewVideo from '../assets/AI_Job_Interviewer_Video_Generation.mp4';
 
 const InterviewPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const config = location.state?.config || {};
-
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState([]);
-  const [currentAnswer, setCurrentAnswer] = useState('');
-  const [timeRemaining, setTimeRemaining] = useState(config.duration === '15 minutes' ? 900 : 1800);
-  const [isComplete, setIsComplete] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [userVideoStream, setUserVideoStream] = useState(null);
-
-  const recognitionRef = useRef(null);
+  const videoRef = useRef(null);
   const userVideoRef = useRef(null);
-  const interviewerVideoRef = useRef(null);
-  const userStreamRef = useRef(null);
+  const recognitionRef = useRef(null);
+  
+  const config = location.state?.config || {};
+  // Parse duration from config (e.g., "30 minutes" -> 30)
+  const durationMatch = config.duration?.match(/(\d+)/);
+  const totalDuration = durationMatch ? parseInt(durationMatch[1]) : 30; // in minutes
+  
+  // Questions array - 5 questions
+  const [questions] = useState([
+    "Have you ever started something from scratch? A project, club or activity? what was your learning?",
+    "Explain a challenging technical problem you've solved recently. What was your approach?",
+    "How do you handle working under pressure or tight deadlines? Can you give an example?",
+    "Describe a time when you had to learn a new technology quickly. How did you approach it?",
+    "What is your process for debugging complex issues? Walk me through your methodology."
+  ]);
+  
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(totalDuration * 60); // in seconds (countdown)
+  const [isRecording, setIsRecording] = useState(false);
+  const [answer, setAnswer] = useState('');
+  const [answers, setAnswers] = useState([]);
 
-  // Mock questions based on configuration
-  const questions = [
-    {
-      id: 1,
-      text: 'Have you ever started something from scratch? A project, club, or activity? What was your learning?',
-      followUp: null
-    },
-    {
-      id: 2,
-      text: `Explain the concept of ${config.jobPosition?.includes('Frontend') ? 'React hooks' : config.jobPosition?.includes('Backend') ? 'RESTful APIs' : 'system design'}.`,
-      followUp: null
-    },
-    {
-      id: 3,
-      text: `What are the key differences between ${config.difficulty === 'Easy' ? 'synchronous and asynchronous' : 'microservices and monolithic'} architecture?`,
-      followUp: null
-    },
-    {
-      id: 4,
-      text: `How would you handle ${config.jobPosition?.includes('Backend') ? 'database connection pooling' : 'state management'} in a production environment?`,
-      followUp: null
-    }
-  ];
+  const currentQuestion = questions[currentQuestionIndex];
 
-  // Initialize speech recognition
+  // Initialize user video (webcam) and audio
+  useEffect(() => {
+    const getUserMedia = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: true, 
+          audio: true 
+        });
+        if (userVideoRef.current) {
+          userVideoRef.current.srcObject = stream;
+        }
+      } catch (error) {
+        console.error('Error accessing webcam/microphone:', error);
+      }
+    };
+
+    getUserMedia();
+
+    // Cleanup: stop all tracks when component unmounts
+    return () => {
+      if (userVideoRef.current && userVideoRef.current.srcObject) {
+        const tracks = userVideoRef.current.srcObject.getTracks();
+        tracks.forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  // Initialize Speech Recognition
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
+      
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-US';
@@ -68,282 +82,223 @@ const InterviewPage = () => {
           }
         }
 
-        setCurrentAnswer(prev => {
-          const base = prev.split(' [Listening...]')[0];
-          return base + finalTranscript + (interimTranscript ? ' [Listening...]' : '');
+        setAnswer(prev => {
+          const newAnswer = prev + finalTranscript;
+          return newAnswer + interimTranscript;
         });
       };
 
       recognitionRef.current.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
-        setIsListening(false);
-        setIsRecording(false);
       };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
+    } else {
+      console.warn('Speech Recognition API not supported in this browser');
     }
 
-    // Initialize user video
-    const initUserVideo = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: true, 
-          audio: false 
-        });
-        userStreamRef.current = stream;
-        setUserVideoStream(stream);
-        if (userVideoRef.current) {
-          userVideoRef.current.srcObject = stream;
-        }
-      } catch (error) {
-        console.error('Error accessing user video:', error);
-      }
-    };
-
-    initUserVideo();
-
     return () => {
-      if (userStreamRef.current) {
-        userStreamRef.current.getTracks().forEach(track => track.stop());
-      }
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
     };
   }, []);
 
-  useEffect(() => {
-    if (timeRemaining > 0 && !isComplete) {
-      const timer = setTimeout(() => setTimeRemaining(timeRemaining - 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (timeRemaining === 0) {
-      handleComplete();
+  // Handle finish interview function
+  const handleFinishInterview = () => {
+    // Stop recognition if active
+    if (recognitionRef.current && isRecording) {
+      recognitionRef.current.stop();
     }
-  }, [timeRemaining, isComplete]);
 
+    // Save final answer if recording
+    if (isRecording && answer) {
+      const currentAnswers = [...answers];
+      currentAnswers[currentQuestionIndex] = answer;
+      setAnswers(currentAnswers);
+    }
+
+    // Navigate to feedback page
+    navigate('/feedback', {
+      state: {
+        config,
+        answers: answers,
+        timeSpent: (totalDuration * 60) - timeRemaining
+      }
+    });
+  };
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (timeRemaining <= 0) {
+      handleFinishInterview();
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [timeRemaining, totalDuration]);
+
+  // Format time as MM:SS (for countdown)
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleStartRecording = () => {
-    if (recognitionRef.current && !isRecording) {
-      setIsRecording(true);
-      setIsListening(true);
-      recognitionRef.current.start();
+  const handleExit = () => {
+    if (window.confirm('Are you sure you want to exit the interview?')) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      navigate('/');
     }
   };
 
-  const handleStopRecording = () => {
-    if (recognitionRef.current && isRecording) {
+  const handleStartAnswer = () => {
+    setIsRecording(true);
+    setAnswer('');
+    
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.start();
+      } catch (error) {
+        console.error('Error starting speech recognition:', error);
+      }
+    }
+  };
+
+  const handleStopAnswer = () => {
+    setIsRecording(false);
+    
+    if (recognitionRef.current) {
       recognitionRef.current.stop();
-      setIsRecording(false);
-      setIsListening(false);
+    }
+
+    // Save current answer
+    const currentAnswers = [...answers];
+    currentAnswers[currentQuestionIndex] = answer;
+    setAnswers(currentAnswers);
+    setAnswer('');
+  };
+
+  const handleNextQuestion = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setAnswer(''); // Clear answer for next question
+    } else {
+      handleFinishInterview();
     }
   };
-
-  const handleRepeatQuestion = () => {
-    // Play the question audio or restart video if needed
-    if (interviewerVideoRef.current) {
-      interviewerVideoRef.current.currentTime = 0;
-      interviewerVideoRef.current.play();
-    }
-  };
-
-  const handleSubmitAnswer = () => {
-    const answerText = currentAnswer.replace(' [Listening...]', '').trim();
-    if (answerText) {
-      if (isRecording) {
-        handleStopRecording();
-      }
-      
-      const newAnswers = [...answers, {
-        questionId: questions[currentQuestionIndex].id,
-        question: questions[currentQuestionIndex].text,
-        answer: answerText,
-        timestamp: Date.now()
-      }];
-
-      setAnswers(newAnswers);
-      setCurrentAnswer('');
-
-      if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(currentQuestionIndex + 1);
-      } else {
-        handleComplete();
-      }
-    }
-  };
-
-  const handleComplete = () => {
-    setIsComplete(true);
-    // Navigate to feedback with answers
-    setTimeout(() => {
-      navigate('/feedback', {
-        state: {
-          config,
-          answers,
-          timeSpent: (config.duration === '15 minutes' ? 900 : 1800) - timeRemaining
-        }
-      });
-    }, 2000);
-  };
-
-  if (isComplete) {
-    return (
-      <div className="min-h-screen bg-[#060010] text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-10 h-10 text-green-400" />
-          </div>
-          <h2 className="text-3xl font-bold mb-4">Interview Complete!</h2>
-          <p className="text-gray-400">Analyzing your responses...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="h-screen w-screen bg-gray-100 flex flex-col overflow-hidden">
-      {/* Main Interviewer Video Container - Takes most of the screen */}
-      <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
-        {/* Background blur effect for office feel */}
-        <div className="absolute inset-0 bg-gradient-to-b from-gray-900/20 to-gray-800/20 backdrop-blur-sm"></div>
-        
-        {/* Main Video */}
-        <div className="relative w-full h-full flex items-center justify-center px-4">
+    <div className="relative w-full h-screen bg-[#060010] overflow-hidden flex flex-col">
+      {/* Top Left - EXIT and Timer */}
+      <div className="absolute top-6 left-6 flex items-center gap-4 z-50">
+        {/* EXIT Button */}
+        <button
+          onClick={handleExit}
+          className="exit-button"
+        >
+          <X className="w-5 h-5" />
+          <span>EXIT</span>
+        </button>
+
+        {/* Timer (Countdown) */}
+        <div className="timer-display">
+          {formatTime(timeRemaining)}
+        </div>
+      </div>
+
+      {/* Video Panels Section - 50/50 Split with Equal Heights */}
+      <div className="flex-1 flex items-stretch gap-4 px-4 pt-20 pb-4">
+        {/* Main Interview Video - Left Half */}
+        <div className="flex-1 flex items-center justify-center">
           <video
-            ref={interviewerVideoRef}
-            src={interviewerVideo}
+            ref={videoRef}
             autoPlay
             loop
             muted
             playsInline
-            className="w-full h-full object-cover"
-          />
-        </div>
-
-        {/* Timer Badge - Top Left Overlay */}
-        <div className="absolute top-6 left-6 bg-black px-4 py-2 rounded-full z-50">
-          <span className="font-mono text-white text-base">{formatTime(timeRemaining)}</span>
-        </div>
-
-        {/* EXIT INTERVIEW Button - Top Right Overlay */}
-        <button
-          onClick={() => navigate('/')}
-          className="absolute top-6 right-6 bg-red-500 hover:bg-red-600 px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 text-sm font-semibold text-white z-50 shadow-lg hover:shadow-xl group"
-        >
-          <X className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
-          <span>EXIT INTERVIEW</span>
-        </button>
-
-        {/* START ANSWER Button - Bottom Center Overlay */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-50">
-          <button
-            onClick={isRecording ? handleStopRecording : handleStartRecording}
-            className={`px-10 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-2xl text-base ${
-              isRecording
-                ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse'
-                : 'bg-green-500 hover:bg-green-600 hover:scale-105 text-white active:scale-95'
-            }`}
+            className="interview-video-split"
           >
-            {isRecording ? (
-              <>
-                <MicOff className="w-6 h-6 animate-pulse" />
-                <span>STOP RECORDING</span>
-              </>
-            ) : (
-              <>
-                <Mic className="w-6 h-6" />
-                <span>START ANSWER</span>
-              </>
-            )}
-          </button>
+            <source src={interviewVideo} type="video/mp4" />
+          </video>
         </div>
 
-      </div>
-
-      {/* User Video Preview - Bottom Right Corner (overlapping question panel) */}
-      <div className="fixed bottom-6 right-6 w-64 h-48 bg-black rounded-xl overflow-hidden border-4 border-white shadow-2xl z-50">
-        {userVideoStream ? (
+        {/* User Video - Right Half */}
+        <div className="flex-1 flex items-center justify-center">
           <video
             ref={userVideoRef}
             autoPlay
             playsInline
             muted
-            className="w-full h-full object-cover"
+            className="user-video-split"
           />
+        </div>
+      </div>
+
+      {/* START/STOP ANSWER Button - Centered below videos */}
+      <div className="flex justify-center py-4 z-50">
+        {!isRecording ? (
+          <button
+            onClick={handleStartAnswer}
+            className="start-answer-button"
+          >
+            <Mic className="w-6 h-6" />
+            <span>START ANSWER</span>
+          </button>
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gray-900">
-            <div className="text-center text-white">
-              <div className="w-12 h-12 border-2 border-white/30 rounded-full mx-auto mb-2 animate-pulse"></div>
-              <p className="text-xs text-white/60">Camera Loading...</p>
-            </div>
-          </div>
+          <button
+            onClick={handleStopAnswer}
+            className="stop-answer-button"
+          >
+            <div className="recording-indicator" />
+            <span>STOP ANSWER</span>
+          </button>
         )}
       </div>
 
-      {/* Question Section - White Panel Below Video */}
-      <div className="bg-white border-t border-gray-200 shadow-lg relative z-30">
-        <div className="max-w-6xl mx-auto px-8 py-6">
-          {/* Question Row */}
-          <div className="flex items-start justify-between gap-6 mb-4">
-            <div className="flex-1">
-              <div className="mb-1">
-                <span className="text-sm font-semibold text-purple-600">Main Question</span>
-              </div>
-              <h2 className="text-lg font-semibold text-black leading-relaxed">
-                {questions[currentQuestionIndex].text}
-              </h2>
-            </div>
-            <button
-              onClick={handleRepeatQuestion}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-md transition-colors text-sm text-gray-700 flex-shrink-0"
-            >
-              <Volume2 className="w-4 h-4" />
-              Repeat Question
-            </button>
-          </div>
-
-          {/* Answer Display Area */}
-          <div className="mt-4">
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 min-h-[120px]">
-              {currentAnswer ? (
-                <p className="text-black whitespace-pre-wrap text-sm leading-relaxed">
-                  {currentAnswer.replace(' [Listening...]', '')}
-                </p>
-              ) : (
-                <p className="text-gray-400 italic text-sm">
-                  {isRecording ? 'Listening... Speak your answer clearly.' : 'Your answer will appear here when you start recording.'}
-                </p>
-              )}
-              {isListening && (
-                <div className="mt-3 flex items-center gap-2 text-green-600 text-xs">
-                  <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></div>
-                  <span>Listening...</span>
-                </div>
-              )}
-            </div>
-
-            {/* Submit Button */}
-            <div className="mt-4 flex justify-end">
+      {/* Question Section - Bottom */}
+      <div className="px-6 pb-6 z-50">
+        <div className="question-container">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="question-heading">Question {currentQuestionIndex + 1} of {questions.length}</h3>
+            {!isRecording && answer && currentQuestionIndex < questions.length - 1 && (
               <button
-                onClick={handleSubmitAnswer}
-                disabled={!currentAnswer.replace(' [Listening...]', '').trim()}
-                className={`px-6 py-2.5 rounded-md font-semibold flex items-center gap-2 transition-all text-sm ${
-                  currentAnswer.replace(' [Listening...]', '').trim()
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
+                onClick={handleNextQuestion}
+                className="next-question-button"
               >
-                {currentQuestionIndex < questions.length - 1 ? 'Next Question' : 'Complete Interview'}
-                <Send className="w-4 h-4" />
+                Next Question →
               </button>
-            </div>
+            )}
+            {!isRecording && currentQuestionIndex === questions.length - 1 && answers.length === questions.length && (
+              <button
+                onClick={handleFinishInterview}
+                className="finish-interview-button"
+              >
+                Finish Interview →
+              </button>
+            )}
           </div>
+          <p className="question-text">{currentQuestion}</p>
+          {answer && (
+            <div className="answer-text">
+              {answer}
+            </div>
+          )}
+          {!answer && !isRecording && (
+            <p className="answer-placeholder">your answer appear here</p>
+          )}
+          {isRecording && !answer && (
+            <p className="answer-placeholder">Listening... Speak your answer</p>
+          )}
         </div>
       </div>
     </div>
@@ -351,5 +306,3 @@ const InterviewPage = () => {
 };
 
 export default InterviewPage;
-
-

@@ -41,16 +41,21 @@ export const generateMockQuestions = (config) => {
   return [
     {
       id: 1,
-      text: `Explain the concept of ${config.jobPosition?.includes('Frontend') ? 'React hooks' : config.jobPosition?.includes('Backend') ? 'RESTful APIs' : 'system design'}.`,
+      text: 'Have you ever started something from scratch? A project, club or activity? what was your learning?',
       followUp: null
     },
     {
       id: 2,
-      text: `What are the key differences between ${config.difficulty === 'Easy' ? 'synchronous and asynchronous' : 'microservices and monolithic'} architecture?`,
+      text: `Explain the concept of ${config.jobPosition?.includes('Frontend') ? 'React hooks' : config.jobPosition?.includes('Backend') ? 'RESTful APIs' : 'system design'}.`,
       followUp: null
     },
     {
       id: 3,
+      text: `What are the key differences between ${config.difficulty === 'Easy' ? 'synchronous and asynchronous' : 'microservices and monolithic'} architecture?`,
+      followUp: null
+    },
+    {
+      id: 4,
       text: `How would you handle ${config.jobPosition?.includes('Backend') ? 'database connection pooling' : 'state management'} in a production environment?`,
       followUp: null
     }
