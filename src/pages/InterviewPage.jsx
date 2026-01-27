@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { X, Mic, Play } from 'lucide-react';
+import { X, Mic, Play, Loader2 } from 'lucide-react';
 import interviewVideo from '../assets/AI_Job_Interviewer_Video_Generation.mp4';
 import { getQuestionCountFromDuration } from '../utils/questionGenerator';
 import { getAttemptedQuestionIds, setAttemptedQuestionIds, saveInterviewSession, updateInterviewSession } from '../utils/storage';
@@ -14,15 +14,15 @@ const InterviewPage = () => {
   const recognitionRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
-  
+
   const config = location.state?.config || {};
   // Parse duration from config (e.g., "30 minutes" -> 30)
   const durationMatch = config.duration?.match(/(\d+)/);
   const totalDuration = durationMatch ? parseInt(durationMatch[1]) : 30; // in minutes
-  
+
   const [questions, setQuestions] = useState([]);
   const [sessionId] = useState(() => crypto.randomUUID());
-  
+
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(totalDuration * 60); // in seconds (countdown)
   const [isRecording, setIsRecording] = useState(false);
@@ -33,7 +33,7 @@ const InterviewPage = () => {
   const [userStream, setUserStream] = useState(null);
   const [answerStartTime, setAnswerStartTime] = useState(null);
   const [typedStartTime, setTypedStartTime] = useState(null);
-  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(true);
   const [isGeneratingFollowUp, setIsGeneratingFollowUp] = useState(false);
   const [questionError, setQuestionError] = useState('');
 
@@ -111,9 +111,9 @@ const InterviewPage = () => {
   useEffect(() => {
     const getUserMedia = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: true, 
-          audio: true 
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true
         });
         setUserStream(stream);
         if (userVideoRef.current) {
@@ -150,7 +150,7 @@ const InterviewPage = () => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
-      
+
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-US';
@@ -202,26 +202,26 @@ const InterviewPage = () => {
       const speakQuestion = () => {
         // Get available voices and select a female voice
         const voices = window.speechSynthesis.getVoices();
-        const femaleVoice = voices.find(voice => 
-          voice.name.toLowerCase().includes('female') || 
+        const femaleVoice = voices.find(voice =>
+          voice.name.toLowerCase().includes('female') ||
           voice.name.toLowerCase().includes('zira') ||
           voice.name.toLowerCase().includes('samantha') ||
           voice.name.toLowerCase().includes('susan') ||
           voice.name.toLowerCase().includes('karen') ||
           voice.name.toLowerCase().includes('hazel') ||
           (voice.lang.startsWith('en') && voice.name.includes('Female'))
-        ) || voices.find(voice => voice.lang.startsWith('en-US') && voice.gender === 'female') 
+        ) || voices.find(voice => voice.lang.startsWith('en-US') && voice.gender === 'female')
           || voices.find(voice => voice.lang.startsWith('en'));
 
         const utterance = new SpeechSynthesisUtterance(currentQuestion.text);
         utterance.rate = 0.9;
         utterance.pitch = 1;
         utterance.volume = 1;
-        
+
         if (femaleVoice) {
           utterance.voice = femaleVoice;
         }
-        
+
         // Start playing video when speech starts
         utterance.onstart = () => {
           if (videoRef.current) {
@@ -229,23 +229,23 @@ const InterviewPage = () => {
             videoRef.current.play();
           }
         };
-        
+
         // Stop/pause video when speech ends
         utterance.onend = () => {
           if (videoRef.current) {
             videoRef.current.pause();
           }
         };
-        
+
         utterance.onerror = () => {
           if (videoRef.current) {
             videoRef.current.pause();
           }
         };
-        
+
         // Cancel any ongoing speech
         window.speechSynthesis.cancel();
-        
+
         // Speak the question
         window.speechSynthesis.speak(utterance);
       };
@@ -299,19 +299,19 @@ const InterviewPage = () => {
     if (window.confirm('Are you sure you want to exit the interview?')) {
       // Stop all media tracks
       stopAllTracks();
-      
+
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
-      
+
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
       }
-      
+
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
-      
+
       navigate('/');
     }
   };
@@ -323,35 +323,35 @@ const InterviewPage = () => {
     setAnswerStartTime(Date.now());
     setTypedStartTime(null);
     audioChunksRef.current = [];
-    
+
     try {
       // Start MediaRecorder for audio recording
       if (userStream) {
         const mediaRecorder = new MediaRecorder(userStream, {
           mimeType: 'audio/webm;codecs=opus'
         });
-        
+
         mediaRecorderRef.current = mediaRecorder;
-        
+
         mediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
             audioChunksRef.current.push(event.data);
           }
         };
-        
+
         mediaRecorder.onstop = () => {
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
           const audioUrl = URL.createObjectURL(audioBlob);
-          
+
           // Store audio recording
           const currentRecordings = [...audioRecordings];
           currentRecordings[currentQuestionIndex] = audioUrl;
           setAudioRecordings(currentRecordings);
         };
-        
+
         mediaRecorder.start();
       }
-      
+
       // Start Speech Recognition
       if (recognitionRef.current) {
         try {
@@ -385,12 +385,12 @@ const InterviewPage = () => {
 
   const handleStopAnswer = () => {
     setIsRecording(false);
-    
+
     // Stop Speech Recognition
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
-    
+
     // Stop MediaRecorder
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
@@ -439,7 +439,7 @@ const InterviewPage = () => {
     if (!isRecording && answer) {
       persistCurrentAnswer(answer);
     }
-    
+
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setAnswer(''); // Clear answer for next question
@@ -453,7 +453,7 @@ const InterviewPage = () => {
     if (recognitionRef.current && isRecording) {
       recognitionRef.current.stop();
     }
-    
+
     // Stop recording if active
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
@@ -480,13 +480,24 @@ const InterviewPage = () => {
     audio.play();
   };
 
+  // Loading Screen
+  if (isGeneratingQuestions) {
+    return (
+      <div className="min-h-screen bg-[#060010] flex flex-col items-center justify-center text-white p-4">
+        <Loader2 className="w-12 h-12 text-pink-500 animate-spin mb-6" />
+        <h2 className="text-3xl font-bold mb-3">Preparing Your Interview</h2>
+        <p className="text-gray-400 text-lg animate-pulse">Analyzing your resume and generating personalized questions...</p>
+      </div>
+    );
+  }
+
   // Summary Screen
   if (showSummary) {
     return (
       <div className="min-h-screen bg-[#060010] text-white p-8">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-4xl font-bold mb-8 text-center">Interview Summary</h1>
-          
+
           <div className="space-y-6">
             {questions.map((question, index) => (
               <div key={index} className="bg-black/40 backdrop-blur-sm rounded-lg p-6 border border-white/10">
@@ -505,7 +516,7 @@ const InterviewPage = () => {
                   )}
                 </div>
                 <p className="text-gray-300 mb-4">{question.text}</p>
-                
+
                 {answers[index]?.text ? (
                   <div className="bg-white/5 rounded-lg p-4">
                     <p className="text-white">{answers[index].text}</p>
