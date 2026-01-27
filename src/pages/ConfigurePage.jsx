@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Briefcase, User, Gauge, Clock, FastForward } from 'lucide-react';
+import { experienceLevels, jobRoles, difficultyLevels, durations } from '../utils/configure';
+import { listGeminiModels } from '../utils/geminiModels';
 
 const ConfigurePage = () => {
   const navigate = useNavigate();
@@ -8,34 +10,47 @@ const ConfigurePage = () => {
   const [selectedRole, setSelectedRole] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('');
   const [selectedDuration, setSelectedDuration] = useState('');
+  const [resumeData, setResumeData] = useState(null);
+  const [resumeFile, setResumeFile] = useState(null);
+  const [resumeFileName, setResumeFileName] = useState('');
+  const [resumeError, setResumeError] = useState('');
+  const [isParsing, setIsParsing] = useState(false);
+  const [isListingModels, setIsListingModels] = useState(false);
+  const [modelList, setModelList] = useState([]);
+  const [modelError, setModelError] = useState('');
 
-  const experienceLevels = [
-    { id: 'intern', label: 'Intern', desc: 'Entry level questions', years: 'Starting out' },
-    { id: 'fresher', label: 'Fresher', desc: 'Graduate level depth', years: '0-1 year' },
-    { id: 'junior', label: 'Junior', desc: 'Foundational concepts', years: '1-2 years' },
-    { id: 'mid', label: 'Mid-Level', desc: 'Practical experience', years: '3-5 years' },
-  ];
+  const handleResumeUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-  const jobRoles = [
-    'Frontend Developer',
-    'Backend Developer',
-    'Full Stack Developer',
-    'DevOps Engineer',
-    'Data Engineer',
-    'Software Engineer',
-  ];
+    setResumeError('');
+    setIsParsing(true);
+    setResumeFileName(file.name);
+    setResumeFile(file);
 
-  const difficultyLevels = [
-    { id: 'easy', label: 'Easy', desc: 'Fundamental concepts' },
-    { id: 'medium', label: 'Medium', desc: 'Intermediate complexity' },
-    { id: 'hard', label: 'Hard', desc: 'Advanced problems' },
-  ];
+    try {
+      setResumeData({ rawText: null });
+    } catch (error) {
+      setResumeError(error.message || 'Unable to parse resume. Please try another file.');
+      setResumeData(null);
+    } finally {
+      setIsParsing(false);
+    }
+  };
 
-  const durations = [
-    { id: '15', label: '15 minutes', desc: 'Quick practice session' },
-    { id: '30', label: '30 minutes', desc: 'Comprehensive interview' },
-    { id: '45', label: '45 minutes', desc: 'Deep-dive session' },
-  ];
+  const handleListModels = async () => {
+    setIsListingModels(true);
+    setModelError('');
+    try {
+      const models = await listGeminiModels();
+      setModelList(models);
+    } catch (error) {
+      setModelError(error.message || 'Failed to list Gemini models.');
+      setModelList([]);
+    } finally {
+      setIsListingModels(false);
+    }
+  };
 
   const handleStart = () => {
     if (selectedExperience && selectedRole && selectedDifficulty && selectedDuration) {
@@ -44,6 +59,9 @@ const ConfigurePage = () => {
         jobPosition: selectedRole,
         difficulty: difficultyLevels.find(d => d.id === selectedDifficulty)?.label || selectedDifficulty,
         duration: durations.find(d => d.id === selectedDuration)?.label || selectedDuration,
+        resumeData: resumeData || null,
+        resumeFile: resumeFile || null,
+        resumeFileName: resumeFileName || null
       };
       navigate('/interview', { state: { config } });
     }
@@ -75,20 +93,58 @@ const ConfigurePage = () => {
       {/* Main Content */}
       <div className="container mx-auto px-6 py-12">
         <div className="max-w-[976px] mx-auto">
+
+
           {/* Title Section */}
           <div className="text-center mb-16">
             <h1 className="text-5xl font-bold mb-4">Configure Your Interview</h1>
             <p className="text-gray-400 text-lg">Customize your mock interview experience</p>
           </div>
 
+          {/* Resume Upload */}
+          <section className="resume-section">
+            <div className="flex items-center gap-3">
+              <div className="icon-wrapper-purple">
+                <Briefcase className="w-5 h-5 text-pink-400" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-semibold">Upload Resume</h2>
+                <p className="text-gray-400 text-sm">PDF or DOCX for resume-based questions</p>
+              </div>
+            </div>
+            <div className="resume-upload-card">
+              <input
+                type="file"
+                accept=".pdf,.docx"
+                onChange={handleResumeUpload}
+                className="resume-input"
+              />
+              <div className="resume-meta">
+                <div className="text-sm text-gray-400">
+                  {isParsing ? 'Parsing resume...' : resumeFileName || 'No file selected'}
+                </div>
+                {resumeError && <div className="resume-error">{resumeError}</div>}
+              </div>
+            </div>
+            {resumeFileName && (
+              <div className="resume-summary">
+                <div className="summary-title">Resume Uploaded</div>
+                <div className="summary-value">
+                  Your resume will be sent directly to Gemini to generate interview questions.
+                </div>
+              </div>
+            )}
+          </section>
+
+
+
           {/* Progress Indicator */}
           <div className="flex items-center justify-center gap-2 mb-12">
             {[selectedExperience, selectedRole, selectedDifficulty, selectedDuration].map((val, i) => (
               <div
                 key={i}
-                className={`h-1.5 w-16 rounded-full transition-all duration-300 ${
-                  val ? 'bg-gradient-to-r from-pink-500 to-red-500' : 'bg-gray-700'
-                }`}
+                className={`h-1.5 w-16 rounded-full transition-all duration-300 ${val ? 'bg-gradient-to-r from-pink-500 to-red-500' : 'bg-gray-700'
+                  }`}
               />
             ))}
           </div>
@@ -195,14 +251,14 @@ const ConfigurePage = () => {
 
           {/* Start Button */}
           <div className="start-button-wrapper">
-          <button
-            onClick={handleStart}
-            disabled={!isComplete}
-            className={`start-button ${isComplete ? 'enabled' : 'disabled'}`}
-          >
-            <span>Start Interview</span>
-            <FastForward className="w-5 h-5" fill="currentColor" />
-          </button>
+            <button
+              onClick={handleStart}
+              disabled={!isComplete}
+              className={`start-button ${isComplete ? 'enabled' : 'disabled'}`}
+            >
+              <span>Start Interview</span>
+              <FastForward className="w-5 h-5" fill="currentColor" />
+            </button>
           </div>
         </div>
       </div>

@@ -14,6 +14,7 @@ export const jobRoles = [
   'DevOps Engineer',
   'Data Engineer',
   'Software Engineer',
+  'HR',
 ];
 
 export const difficultyLevels = [

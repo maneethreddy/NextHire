@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { X, Mic, Play } from 'lucide-react';
 import interviewVideo from '../assets/AI_Job_Interviewer_Video_Generation.mp4';
+import { getQuestionCountFromDuration } from '../utils/questionGenerator';
+import { getAttemptedQuestionIds, setAttemptedQuestionIds, saveInterviewSession, updateInterviewSession } from '../utils/storage';
+import { generateGeminiQuestions } from '../utils/geminiQuestions';
 
 const InterviewPage = () => {
   const navigate = useNavigate();
@@ -17,14 +20,8 @@ const InterviewPage = () => {
   const durationMatch = config.duration?.match(/(\d+)/);
   const totalDuration = durationMatch ? parseInt(durationMatch[1]) : 30; // in minutes
   
-  // Questions array - 5 questions
-  const [questions] = useState([
-    "Have you ever started something from scratch? A project, club or activity? what was your learning?",
-    "Explain a challenging technical problem you've solved recently. What was your approach?",
-    "How do you handle working under pressure or tight deadlines? Can you give an example?",
-    "Describe a time when you had to learn a new technology quickly. How did you approach it?",
-    "What is your process for debugging complex issues? Walk me through your methodology."
-  ]);
+  const [questions, setQuestions] = useState([]);
+  const [sessionId] = useState(() => crypto.randomUUID());
   
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(totalDuration * 60); // in seconds (countdown)
@@ -34,8 +31,81 @@ const InterviewPage = () => {
   const [audioRecordings, setAudioRecordings] = useState([]); // Array of audio blobs
   const [showSummary, setShowSummary] = useState(false);
   const [userStream, setUserStream] = useState(null);
+  const [answerStartTime, setAnswerStartTime] = useState(null);
+  const [typedStartTime, setTypedStartTime] = useState(null);
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+  const [isGeneratingFollowUp, setIsGeneratingFollowUp] = useState(false);
+  const [questionError, setQuestionError] = useState('');
 
   const currentQuestion = questions[currentQuestionIndex];
+
+  useEffect(() => {
+    if (questions.length > 0) return;
+    let isMounted = true;
+
+    const loadQuestions = async () => {
+      setIsGeneratingQuestions(true);
+      setQuestionError('');
+      const totalQuestions = getQuestionCountFromDuration(config.duration);
+      let selectedQuestions = [];
+      let breakdown = { skill: 0, project: 0, hr: 0 };
+
+      try {
+        if (!config.resumeFile) {
+          throw new Error('Resume file missing. Please upload your resume to generate questions.');
+        }
+        if (!import.meta.env.VITE_GEMINI_API_KEY) {
+          throw new Error('Gemini API key missing. Please set VITE_GEMINI_API_KEY.');
+        }
+        selectedQuestions = await generateGeminiQuestions({
+          resumeFile: config.resumeFile,
+          jobRole: config.jobPosition,
+          difficulty: config.difficulty,
+          count: totalQuestions
+        });
+      } catch (error) {
+        console.warn('Gemini question generation failed.', error);
+        setQuestionError(error.message || 'Failed to generate questions from resume.');
+      }
+
+      if (selectedQuestions.length) {
+        breakdown = {
+          skill: selectedQuestions.filter((q) => q.category === 'skill').length,
+          project: selectedQuestions.filter((q) => q.category === 'project').length,
+          hr: selectedQuestions.filter((q) => q.category === 'hr').length
+        };
+      }
+
+      if (!isMounted) return;
+      setQuestions(selectedQuestions);
+      setAttemptedQuestionIds(
+        Array.from(new Set([...getAttemptedQuestionIds(), ...selectedQuestions.map((q) => q.questionId)]))
+      );
+
+      const session = {
+        id: sessionId,
+        startedAt: new Date().toISOString(),
+        config,
+        resumeData: config.resumeData || null,
+        questions: selectedQuestions,
+        breakdown
+      };
+
+      saveInterviewSession(session);
+      setIsGeneratingQuestions(false);
+    };
+
+    loadQuestions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [config, questions.length, sessionId]);
+
+  useEffect(() => {
+    setAnswer(answers[currentQuestionIndex]?.text || '');
+    setTypedStartTime(null);
+  }, [currentQuestionIndex, answers]);
 
   // Initialize user video (webcam) and audio
   useEffect(() => {
@@ -128,7 +198,7 @@ const InterviewPage = () => {
 
   // Text-to-speech for questions
   useEffect(() => {
-    if (currentQuestion && 'speechSynthesis' in window && videoRef.current) {
+    if (currentQuestion?.text && 'speechSynthesis' in window && videoRef.current) {
       const speakQuestion = () => {
         // Get available voices and select a female voice
         const voices = window.speechSynthesis.getVoices();
@@ -143,7 +213,7 @@ const InterviewPage = () => {
         ) || voices.find(voice => voice.lang.startsWith('en-US') && voice.gender === 'female') 
           || voices.find(voice => voice.lang.startsWith('en'));
 
-        const utterance = new SpeechSynthesisUtterance(currentQuestion);
+        const utterance = new SpeechSynthesisUtterance(currentQuestion.text);
         utterance.rate = 0.9;
         utterance.pitch = 1;
         utterance.volume = 1;
@@ -249,7 +319,9 @@ const InterviewPage = () => {
   const handleStartAnswer = async () => {
     setIsRecording(true);
     // Start with saved answer if exists, otherwise empty
-    setAnswer(answers[currentQuestionIndex] || '');
+    setAnswer(answers[currentQuestionIndex]?.text || '');
+    setAnswerStartTime(Date.now());
+    setTypedStartTime(null);
     audioChunksRef.current = [];
     
     try {
@@ -294,6 +366,23 @@ const InterviewPage = () => {
     }
   };
 
+  const persistCurrentAnswer = (finalText) => {
+    const trimmed = finalText.trim();
+    if (!trimmed) return;
+
+    const currentAnswers = [...answers];
+    const startedAt = answerStartTime || typedStartTime || Date.now();
+
+    currentAnswers[currentQuestionIndex] = {
+      text: trimmed,
+      startedAt,
+      endedAt: Date.now()
+    };
+
+    setAnswers(currentAnswers);
+    return currentAnswers;
+  };
+
   const handleStopAnswer = () => {
     setIsRecording(false);
     
@@ -309,10 +398,35 @@ const InterviewPage = () => {
 
     // Save current answer transcript (remove any interim results)
     if (answer) {
-      const currentAnswers = [...answers];
-      // Store only the final answer (without interim results)
-      currentAnswers[currentQuestionIndex] = answer.replace(/undefined/g, '').trim();
-      setAnswers(currentAnswers);
+      persistCurrentAnswer(answer.replace(/undefined/g, ''));
+    }
+    setAnswerStartTime(null);
+  };
+
+  const handleGenerateFollowUp = async () => {
+    if (!currentQuestion || !answers[currentQuestionIndex]?.text) return;
+    setIsGeneratingFollowUp(true);
+
+    try {
+      const followUps = await generateGeminiQuestions({
+        resumeFile: config.resumeFile,
+        jobRole: config.jobPosition,
+        difficulty: config.difficulty,
+        count: 1,
+        mode: 'followup',
+        previousQuestions: [currentQuestion.text],
+        previousAnswers: [answers[currentQuestionIndex].text]
+      });
+
+      if (followUps.length) {
+        const updatedQuestions = [...questions];
+        updatedQuestions.splice(currentQuestionIndex + 1, 0, ...followUps);
+        setQuestions(updatedQuestions);
+      }
+    } catch (error) {
+      console.warn('Failed to generate follow-up question.', error);
+    } finally {
+      setIsGeneratingFollowUp(false);
     }
   };
 
@@ -320,6 +434,10 @@ const InterviewPage = () => {
     // Make sure recording is stopped
     if (isRecording) {
       handleStopAnswer();
+    }
+
+    if (!isRecording && answer) {
+      persistCurrentAnswer(answer);
     }
     
     if (currentQuestionIndex < questions.length - 1) {
@@ -342,14 +460,15 @@ const InterviewPage = () => {
     }
 
     // Save final answer if recording
-    if (isRecording && answer) {
-      const currentAnswers = [...answers];
-      currentAnswers[currentQuestionIndex] = answer;
-      setAnswers(currentAnswers);
-    }
+    const finalAnswers = answer ? persistCurrentAnswer(answer) : answers;
 
     // Stop all media tracks
     stopAllTracks();
+
+    updateInterviewSession(sessionId, {
+      completedAt: new Date().toISOString(),
+      answers: finalAnswers || answers
+    });
 
     // Show summary screen
     setShowSummary(true);
@@ -385,11 +504,11 @@ const InterviewPage = () => {
                     </button>
                   )}
                 </div>
-                <p className="text-gray-300 mb-4">{question}</p>
+                <p className="text-gray-300 mb-4">{question.text}</p>
                 
-                {answers[index] ? (
+                {answers[index]?.text ? (
                   <div className="bg-white/5 rounded-lg p-4">
-                    <p className="text-white">{answers[index]}</p>
+                    <p className="text-white">{answers[index].text}</p>
                   </div>
                 ) : (
                   <p className="text-gray-500 italic">No answer recorded</p>
@@ -403,9 +522,11 @@ const InterviewPage = () => {
               onClick={() => navigate('/feedback', {
                 state: {
                   config,
+                  questions,
                   answers: answers,
                   audioRecordings: audioRecordings,
-                  timeSpent: (totalDuration * 60) - timeRemaining
+                  timeSpent: (totalDuration * 60) - timeRemaining,
+                  sessionId
                 }
               })}
               className="finish-interview-button"
@@ -495,7 +616,7 @@ const InterviewPage = () => {
         <div className="question-container">
           <div className="flex items-center justify-between mb-4">
             <h3 className="question-heading">Question {currentQuestionIndex + 1} of {questions.length}</h3>
-            {!isRecording && (answer || answers[currentQuestionIndex]) && currentQuestionIndex < questions.length - 1 && (
+            {!isRecording && (answer || answers[currentQuestionIndex]?.text) && currentQuestionIndex < questions.length - 1 && (
               <button
                 onClick={handleNextQuestion}
                 className="next-question-button"
@@ -512,22 +633,36 @@ const InterviewPage = () => {
               </button>
             )}
           </div>
-          <p className="question-text">{currentQuestion}</p>
-          {answer && (
-            <div className="answer-text">
-              {answer}
-            </div>
+          <p className="question-text">
+            {questionError
+              ? questionError
+              : isGeneratingQuestions
+                ? 'Generating personalized questions from your resume...'
+                : currentQuestion?.text || 'Preparing your interview...'}
+          </p>
+          <textarea
+            value={answer}
+            onChange={(event) => {
+              if (!typedStartTime) {
+                setTypedStartTime(Date.now());
+              }
+              setAnswer(event.target.value);
+            }}
+            disabled={isRecording}
+            placeholder={isRecording ? 'Listening... Speak your answer' : 'Type or speak your answer here'}
+            className="answer-input"
+          />
+          {!answer && !isRecording && !answers[currentQuestionIndex]?.text && (
+            <p className="answer-placeholder">Your answer will appear here</p>
           )}
-          {!answer && !isRecording && !answers[currentQuestionIndex] && (
-            <p className="answer-placeholder">your answer appear here</p>
-          )}
-          {isRecording && !answer && (
-            <p className="answer-placeholder">Listening... Speak your answer</p>
-          )}
-          {!isRecording && answers[currentQuestionIndex] && !answer && (
-            <div className="answer-text">
-              {answers[currentQuestionIndex]}
-            </div>
+          {!isRecording && answers[currentQuestionIndex]?.text && (
+            <button
+              onClick={handleGenerateFollowUp}
+              className="next-question-button"
+              disabled={isGeneratingFollowUp}
+            >
+              {isGeneratingFollowUp ? 'Generating Follow-up...' : 'Generate Follow-up'}
+            </button>
           )}
         </div>
       </div>

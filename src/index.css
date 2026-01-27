@@ -1633,6 +1633,152 @@ h1, h2, h3, h4, h5, h6 {
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+/* Resume Upload */
+.resume-section {
+  width: 976px;
+  margin-bottom: 48px;
+}
+
+.resume-section > div:first-child {
+  margin-bottom: 1.5rem;
+}
+
+.resume-upload-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.resume-input {
+  color: white;
+}
+
+.resume-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.resume-error {
+  color: #fca5a5;
+  font-size: 0.85rem;
+}
+
+.resume-summary {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.summary-title {
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.summary-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 0.5rem;
+}
+
+.summary-value {
+  font-size: 0.95rem;
+  color: white;
+}
+
+/* Answer input */
+.answer-input {
+  width: 100%;
+  min-height: 120px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 12px;
+  color: white;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.answer-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Evaluation */
+.score-pill {
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pill-green {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+.pill-yellow {
+  background: rgba(234, 179, 8, 0.2);
+  color: #facc15;
+}
+
+.pill-red {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.evaluation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.evaluation-label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.evaluation-value {
+  font-size: 0.95rem;
+  color: white;
+}
+
+.evaluation-feedback {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.evaluation-disclaimer {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
 @keyframes pulse {
   0%, 100% {
     opacity: 1;

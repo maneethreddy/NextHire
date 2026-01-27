@@ -1,43 +1,15 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, TrendingUp, Brain, Target, Zap, CheckCircle2, XCircle, AlertTriangle, Clock } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { evaluateInterview } from '../utils/evaluation';
 
 const FeedbackPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { config, answers, timeSpent } = location.state || {};
-
-  // Mock analytics data
-  const analytics = {
-    agi: {
-      score: 78,
-      missing: ['Database indexing', 'Caching strategies'],
-      weak: ['API design patterns'],
-      covered: ['REST principles', 'Error handling', 'Security']
-    },
-    iri: {
-      score: 82,
-      status: 'Stable',
-      consistency: 'High'
-    },
-    tai: {
-      score: 75,
-      alignment: 'Good',
-      suggestions: ['Use more industry-standard terminology', 'Reference specific frameworks']
-    },
-    ace: {
-      score: 68,
-      efficiency: 'Moderate',
-      ratio: '0.72'
-    },
-    edd: {
-      detected: false,
-      drift: 'Minimal'
-    }
-  };
-
-  const overallScore = Math.round(
-    (analytics.agi.score + analytics.iri.score + analytics.tai.score + analytics.ace.score) / 4
-  );
+  const { config, answers, questions } = location.state || {};
+  const evaluation = questions?.length
+    ? evaluateInterview({ questions, answers, resumeData: config?.resumeData, config })
+    : null;
+  const overallScore = evaluation?.overallScore || 0;
 
   return (
     <div className="min-h-screen bg-[#060010] text-white">
@@ -90,161 +62,66 @@ const FeedbackPage = () => {
             </div>
           </div>
 
-          {/* Metrics Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {/* AGI */}
-            <div className="bg-black/30 rounded-2xl p-6 border border-white/10">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
-                  <Brain className="w-5 h-5 text-red-400" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">Answer Gap Intelligence</h3>
-                  <div className="text-2xl font-bold text-red-400">{analytics.agi.score}</div>
-                </div>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div>
-                  <div className="text-gray-400 mb-1">Missing Concepts:</div>
-                  <div className="flex flex-wrap gap-2">
-                    {analytics.agi.missing.map((item, i) => (
-                      <span key={i} className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs">
-                        {item}
+          {/* Per-Question Evaluation */}
+          {evaluation && (
+            <div className="mb-8">
+              <h2 className="text-3xl font-semibold mb-6 text-center">Per-Question Evaluation</h2>
+              <div className="grid md:grid-cols-2 gap-6">
+                {questions.map((question, index) => {
+                  const result = evaluation.questionResults[index];
+                  return (
+                    <div key={question.questionId} className="bg-black/30 rounded-2xl p-6 border border-white/10">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-semibold">Question {index + 1}</h3>
+                        <span className={`score-pill ${result.correctnessLabel.toLowerCase().includes('correct') ? 'pill-green' : result.correctnessLabel.toLowerCase().includes('partial') ? 'pill-yellow' : 'pill-red'}`}>
+                          {result.correctnessLabel}
                       </span>
-                    ))}
                   </div>
+                      <p className="text-gray-300 mb-4">{question.text}</p>
+                      <div className="evaluation-grid">
+                <div>
+                          <div className="evaluation-label">Semantic Relevance</div>
+                          <div className="evaluation-value">{result.semanticRelevanceScore}</div>
                 </div>
                 <div>
-                  <div className="text-gray-400 mb-1">Weak Areas:</div>
-                  <div className="flex flex-wrap gap-2">
-                    {analytics.agi.weak.map((item, i) => (
-                      <span key={i} className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs">
-                        {item}
-                      </span>
-                    ))}
-                  </div>
+                          <div className="evaluation-label">Concept Coverage</div>
+                          <div className="evaluation-value">{result.conceptCoveragePercent}%</div>
+                </div>
+                <div>
+                          <div className="evaluation-label">Missing Concepts</div>
+                          <div className="evaluation-value">
+                            {result.missingConcepts.length ? result.missingConcepts.join(', ') : 'None'}
                 </div>
               </div>
             </div>
-
-            {/* IRI */}
-            <div className="bg-black/30 rounded-2xl p-6 border border-white/10">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-blue-400" />
+                      <div className="evaluation-feedback">{result.feedback}</div>
                 </div>
-                <div>
-                  <h3 className="font-semibold">Interview Robustness Index</h3>
-                  <div className="text-2xl font-bold text-blue-400">{analytics.iri.score}</div>
-                </div>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Status:</span>
-                  <span className="text-green-400 font-semibold">{analytics.iri.status}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Consistency:</span>
-                  <span className="text-green-400 font-semibold">{analytics.iri.consistency}</span>
-                </div>
+                  );
+                })}
               </div>
             </div>
-
-            {/* TAI */}
-            <div className="bg-black/30 rounded-2xl p-6 border border-white/10">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                  <Target className="w-5 h-5 text-purple-400" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">Terminology Alignment</h3>
-                  <div className="text-2xl font-bold text-purple-400">{analytics.tai.score}</div>
-                </div>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Alignment:</span>
-                  <span className="text-green-400 font-semibold">{analytics.tai.alignment}</span>
-                </div>
-                <div className="text-gray-400 text-xs">
-                  {analytics.tai.suggestions[0]}
-                </div>
-              </div>
-            </div>
-
-            {/* ACE */}
-            <div className="bg-black/30 rounded-2xl p-6 border border-white/10">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
-                  <Zap className="w-5 h-5 text-green-400" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">Answer Compression</h3>
-                  <div className="text-2xl font-bold text-green-400">{analytics.ace.score}</div>
-                </div>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Efficiency:</span>
-                  <span className="text-yellow-400 font-semibold">{analytics.ace.efficiency}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Ratio:</span>
-                  <span className="font-semibold">{analytics.ace.ratio}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* EDD */}
-            <div className="bg-black/30 rounded-2xl p-6 border border-white/10">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-orange-400" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">Expectation Drift</h3>
-                  <div className="text-2xl font-bold text-orange-400">
-                    {analytics.edd.detected ? 'Detected' : 'None'}
-                  </div>
-                </div>
-              </div>
-              <div className="text-sm text-gray-400">
-                {analytics.edd.drift} semantic deviation detected
-              </div>
-            </div>
-
-            {/* CLT */}
-            <div className="bg-black/30 rounded-2xl p-6 border border-white/10">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-cyan-400" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">Cognitive Latency</h3>
-                  <div className="text-2xl font-bold text-cyan-400">Enabled</div>
-                </div>
-              </div>
-              <div className="text-sm text-gray-400">
-                Thinking time separated from answer quality
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* Recommendations */}
           <div className="bg-black/30 rounded-2xl p-8 border border-white/10">
             <h2 className="text-2xl font-semibold mb-6">Recommendations</h2>
             <div className="space-y-4">
-              {[
-                'Focus on database optimization concepts for backend roles',
-                'Practice using industry-standard terminology',
-                'Improve answer compression efficiency',
-                'Strengthen understanding of API design patterns'
-              ].map((rec, i) => (
+              {evaluation?.summary?.missingConcepts?.length ? (
+                evaluation.summary.missingConcepts.map((rec, i) => (
                 <div key={i} className="flex items-start gap-3 p-4 bg-black/20 rounded-xl">
+                    <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                    <span>Review: {rec}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="flex items-start gap-3 p-4 bg-black/20 rounded-xl">
                   <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-                  <span>{rec}</span>
+                  <span>Keep practicing to improve coverage and depth.</span>
                 </div>
-              ))}
+              )}
+              <div className="evaluation-disclaimer">
+                Feedback is generated with deterministic semantic similarity and concept matching. It does not claim full human-level understanding.
+              </div>
             </div>
           </div>
 
