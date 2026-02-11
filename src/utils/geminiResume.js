@@ -38,6 +38,8 @@ const normalizeExtracted = (data) => ({
   experienceLevel: data?.experienceLevel === 'experienced' ? 'experienced' : 'fresher'
 });
 
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const extractResumeInsights = async (resumeText) => {
   const apiKey = getApiKey();
   if (!apiKey) {
@@ -48,16 +50,48 @@ export const extractResumeInsights = async (resumeText) => {
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
   let text = '';
+  
+  let attempt = 0;
+  const maxRetries = 5;
+  let lastError = null;
 
-  try {
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.2 }
-    });
-    text = result.response.text();
-  } catch (error) {
-    throw new Error(`Gemini resume extraction failed. ${error.message || ''}`.trim());
+  while (attempt <= maxRetries) {
+    try {
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.2 }
+      });
+      text = result.response.text();
+      break; // Success, exit retry loop
+    } catch (error) {
+      lastError = error;
+      const errorMessage = error.message || '';
+      
+      const isRetryable = errorMessage.includes('429') || errorMessage.includes('503') || errorMessage.includes('Resource exhausted');
+      
+      if (attempt < maxRetries && isRetryable) {
+        attempt++;
+        const waitTime = Math.min(Math.pow(2, attempt) * 2000 + Math.random() * 2000, 60000);
+        console.warn(`Resume extraction rate limited. Retry ${attempt}/${maxRetries} in ${Math.round(waitTime / 1000)}s...`);
+        await delay(waitTime);
+        continue;
+      }
+      
+      break; // Not retryable or max retries reached
+    }
   }
+  
+  if (!text) {
+    const errorMessage = lastError?.message || '';
+    if (errorMessage.includes('429') || errorMessage.includes('Resource exhausted')) {
+      throw new Error(
+        `Gemini API rate limit exhausted. Your API quota may be exceeded. ` +
+        `Please check https://console.cloud.google.com/apis/dashboard or wait a few minutes.`
+      );
+    }
+    throw new Error(`Gemini resume extraction failed. ${lastError?.message || ''}`.trim());
+  }
+  
   const parsed = safeParseJsonObject(text);
 
   if (!parsed) {

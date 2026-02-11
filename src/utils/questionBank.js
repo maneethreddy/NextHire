@@ -6,7 +6,13 @@ export const QUESTION_BANK = [
     role: ['frontend', 'fullstack'],
     difficulty: 'easy',
     category: 'skill',
-    expectedConcepts: ['stateful logic reuse', 'useState basics', 'side effects', 'dependency array', 'cleanup'],
+    expectedConcepts: [
+      { concept: 'useState basics', importance: 'core', synonyms: [] },
+      { concept: 'side effects', importance: 'core', synonyms: [] },
+      { concept: 'dependency array', importance: 'supporting', synonyms: [] },
+      { concept: 'cleanup', importance: 'supporting', synonyms: [] },
+      { concept: 'stateful logic reuse', importance: 'optional', synonyms: [] }
+    ],
     conceptDescriptions: {
       'stateful logic reuse': 'Explain how hooks allow sharing stateful logic without classes.',
       'useState basics': 'Mention initializing state and updating it in function components.',
@@ -22,7 +28,12 @@ export const QUESTION_BANK = [
     role: ['frontend'],
     difficulty: 'easy',
     category: 'skill',
-    expectedConcepts: ['one-dimensional vs two-dimensional', 'alignment control', 'layout intent', 'browser support'],
+    expectedConcepts: [
+      { concept: 'one-dimensional vs two-dimensional', importance: 'core', synonyms: [] },
+      { concept: 'layout intent', importance: 'core', synonyms: [] },
+      { concept: 'alignment control', importance: 'supporting', synonyms: [] },
+      { concept: 'browser support', importance: 'optional', synonyms: [] }
+    ],
     conceptDescriptions: {
       'one-dimensional vs two-dimensional': 'Flexbox is one-dimensional, Grid is two-dimensional.',
       'alignment control': 'Explain how each handles alignment and spacing.',
@@ -37,7 +48,13 @@ export const QUESTION_BANK = [
     role: ['frontend', 'fullstack'],
     difficulty: 'medium',
     category: 'skill',
-    expectedConcepts: ['memoization', 'code splitting', 'avoid re-renders', 'profiling', 'lazy loading'],
+    expectedConcepts: [
+      { concept: 'avoid re-renders', importance: 'core', synonyms: [] },
+      { concept: 'memoization', importance: 'core', synonyms: [] },
+      { concept: 'code splitting', importance: 'supporting', synonyms: [] },
+      { concept: 'profiling', importance: 'supporting', synonyms: [] },
+      { concept: 'lazy loading', importance: 'optional', synonyms: [] }
+    ],
     conceptDescriptions: {
       'memoization': 'Use memo, useMemo, or useCallback appropriately.',
       'code splitting': 'Split bundles by route or component.',
@@ -53,7 +70,13 @@ export const QUESTION_BANK = [
     role: ['frontend', 'fullstack'],
     difficulty: 'medium',
     category: 'skill',
-    expectedConcepts: ['semantic HTML', 'keyboard navigation', 'aria usage', 'contrast', 'screen reader testing'],
+    expectedConcepts: [
+      { concept: 'semantic HTML', importance: 'core', synonyms: [] },
+      { concept: 'keyboard navigation', importance: 'core', synonyms: [] },
+      { concept: 'aria usage', importance: 'supporting', synonyms: [] },
+      { concept: 'contrast', importance: 'supporting', synonyms: [] },
+      { concept: 'screen reader testing', importance: 'optional', synonyms: [] }
+    ],
     conceptDescriptions: {
       'semantic HTML': 'Use correct tags for structure and meaning.',
       'keyboard navigation': 'Ensure focus order and visible focus.',
@@ -69,7 +92,13 @@ export const QUESTION_BANK = [
     role: ['backend', 'fullstack'],
     difficulty: 'easy',
     category: 'skill',
-    expectedConcepts: ['resource-based URLs', 'http methods', 'status codes', 'statelessness', 'versioning'],
+    expectedConcepts: [
+      { concept: 'resource-based URLs', importance: 'core', synonyms: [] },
+      { concept: 'http methods', importance: 'core', synonyms: [] },
+      { concept: 'statelessness', importance: 'supporting', synonyms: [] },
+      { concept: 'status codes', importance: 'supporting', synonyms: [] },
+      { concept: 'versioning', importance: 'optional', synonyms: [] }
+    ],
     conceptDescriptions: {
       'resource-based URLs': 'Use nouns and consistent URL patterns.',
       'http methods': 'Use GET/POST/PUT/PATCH/DELETE correctly.',
@@ -85,7 +114,12 @@ export const QUESTION_BANK = [
     role: ['backend', 'data'],
     difficulty: 'medium',
     category: 'skill',
-    expectedConcepts: ['index structure', 'read vs write tradeoff', 'selectivity', 'query planning'],
+    expectedConcepts: [
+      { concept: 'index structure', importance: 'core', synonyms: [] },
+      { concept: 'read vs write tradeoff', importance: 'core', synonyms: [] },
+      { concept: 'selectivity', importance: 'supporting', synonyms: [] },
+      { concept: 'query planning', importance: 'optional', synonyms: [] }
+    ],
     conceptDescriptions: {
       'index structure': 'Mention B-trees or hash indexes.',
       'read vs write tradeoff': 'Indexes speed reads but slow writes.',
@@ -100,7 +134,12 @@ export const QUESTION_BANK = [
     role: ['backend', 'fullstack'],
     difficulty: 'medium',
     category: 'skill',
-    expectedConcepts: ['cache layers', 'cache invalidation', 'read-heavy workloads', 'ttl strategy'],
+    expectedConcepts: [
+      { concept: 'cache layers', importance: 'core', synonyms: [] },
+      { concept: 'cache invalidation', importance: 'core', synonyms: [] },
+      { concept: 'read-heavy workloads', importance: 'supporting', synonyms: [] },
+      { concept: 'ttl strategy', importance: 'optional', synonyms: [] }
+    ],
     conceptDescriptions: {
       'cache layers': 'In-memory, distributed cache, or CDN.',
       'cache invalidation': 'Describe strategies like write-through or TTL.',
@@ -115,7 +154,12 @@ export const QUESTION_BANK = [
     role: ['backend', 'fullstack'],
     difficulty: 'medium',
     category: 'skill',
-    expectedConcepts: ['token-based auth', 'authorization', 'secure storage', 'rate limiting'],
+    expectedConcepts: [
+      { concept: 'token-based auth', importance: 'core', synonyms: [] },
+      { concept: 'authorization', importance: 'core', synonyms: [] },
+      { concept: 'secure storage', importance: 'supporting', synonyms: [] },
+      { concept: 'rate limiting', importance: 'optional', synonyms: [] }
+    ],
     conceptDescriptions: {
       'token-based auth': 'JWT or opaque tokens.',
       'authorization': 'Role or scope-based access control.',
@@ -130,7 +174,12 @@ export const QUESTION_BANK = [
     role: ['frontend', 'backend', 'fullstack'],
     difficulty: 'easy',
     category: 'project',
-    expectedConcepts: ['problem statement', 'solution approach', 'metrics', 'stakeholders'],
+    expectedConcepts: [
+      { concept: 'problem statement', importance: 'core', synonyms: [] },
+      { concept: 'solution approach', importance: 'core', synonyms: [] },
+      { concept: 'metrics', importance: 'supporting', synonyms: [] },
+      { concept: 'stakeholders', importance: 'optional', synonyms: [] }
+    ],
     conceptDescriptions: {
       'problem statement': 'Define the initial pain point or goal.',
       'solution approach': 'Describe implementation or design steps.',
@@ -145,7 +194,12 @@ export const QUESTION_BANK = [
     role: ['frontend', 'backend', 'fullstack'],
     difficulty: 'medium',
     category: 'project',
-    expectedConcepts: ['constraints', 'alternatives', 'decision rationale', 'impact'],
+    expectedConcepts: [
+      { concept: 'constraints', importance: 'core', synonyms: [] },
+      { concept: 'decision rationale', importance: 'core', synonyms: [] },
+      { concept: 'alternatives', importance: 'supporting', synonyms: [] },
+      { concept: 'impact', importance: 'optional', synonyms: [] }
+    ],
     conceptDescriptions: {
       'constraints': 'Time, scope, or technical limits.',
       'alternatives': 'Other options you considered.',
@@ -160,7 +214,12 @@ export const QUESTION_BANK = [
     role: ['frontend', 'backend', 'fullstack'],
     difficulty: 'medium',
     category: 'project',
-    expectedConcepts: ['issue detection', 'root cause analysis', 'fix validation', 'prevention'],
+    expectedConcepts: [
+      { concept: 'root cause analysis', importance: 'core', synonyms: [] },
+      { concept: 'fix validation', importance: 'core', synonyms: [] },
+      { concept: 'issue detection', importance: 'supporting', synonyms: [] },
+      { concept: 'prevention', importance: 'optional', synonyms: [] }
+    ],
     conceptDescriptions: {
       'issue detection': 'How you became aware of the issue.',
       'root cause analysis': 'Steps to find the root cause.',
@@ -175,7 +234,12 @@ export const QUESTION_BANK = [
     role: ['hr', 'any'],
     difficulty: 'easy',
     category: 'hr',
-    expectedConcepts: ['listening', 'collaboration', 'resolution', 'professional tone'],
+    expectedConcepts: [
+      { concept: 'listening', importance: 'core', synonyms: [] },
+      { concept: 'collaboration', importance: 'core', synonyms: [] },
+      { concept: 'resolution', importance: 'supporting', synonyms: [] },
+      { concept: 'professional tone', importance: 'optional', synonyms: [] }
+    ],
     conceptDescriptions: {
       'listening': 'Show you listened and understood the other side.',
       'collaboration': 'Focus on shared goals.',
@@ -190,7 +254,12 @@ export const QUESTION_BANK = [
     role: ['hr', 'any'],
     difficulty: 'easy',
     category: 'hr',
-    expectedConcepts: ['urgency vs importance', 'communication', 'tradeoffs', 'planning'],
+    expectedConcepts: [
+      { concept: 'urgency vs importance', importance: 'core', synonyms: [] },
+      { concept: 'planning', importance: 'core', synonyms: [] },
+      { concept: 'communication', importance: 'supporting', synonyms: [] },
+      { concept: 'tradeoffs', importance: 'optional', synonyms: [] }
+    ],
     conceptDescriptions: {
       'urgency vs importance': 'Use a prioritization framework.',
       'communication': 'Align with stakeholders on priorities.',
@@ -205,7 +274,13 @@ export const QUESTION_BANK = [
     role: ['backend', 'fullstack'],
     difficulty: 'hard',
     category: 'skill',
-    expectedConcepts: ['data model', 'hashing', 'scalability', 'caching', 'rate limiting'],
+    expectedConcepts: [
+      { concept: 'data model', importance: 'core', synonyms: [] },
+      { concept: 'hashing', importance: 'core', synonyms: [] },
+      { concept: 'scalability', importance: 'core', synonyms: [] },
+      { concept: 'caching', importance: 'supporting', synonyms: [] },
+      { concept: 'rate limiting', importance: 'optional', synonyms: [] }
+    ],
     conceptDescriptions: {
       'data model': 'Short code mapping to full URL.',
       'hashing': 'Base62 or hashing strategy.',
@@ -221,7 +296,12 @@ export const QUESTION_BANK = [
     role: ['frontend', 'fullstack'],
     difficulty: 'medium',
     category: 'skill',
-    expectedConcepts: ['scope of state', 'prop drilling', 'state ownership', 'performance'],
+    expectedConcepts: [
+      { concept: 'scope of state', importance: 'core', synonyms: [] },
+      { concept: 'state ownership', importance: 'core', synonyms: [] },
+      { concept: 'prop drilling', importance: 'supporting', synonyms: [] },
+      { concept: 'performance', importance: 'optional', synonyms: [] }
+    ],
     conceptDescriptions: {
       'scope of state': 'Who needs the data.',
       'prop drilling': 'Avoid excessive prop passing.',
@@ -236,7 +316,12 @@ export const QUESTION_BANK = [
     role: ['hr', 'any'],
     difficulty: 'medium',
     category: 'hr',
-    expectedConcepts: ['initiative', 'impact', 'communication', 'reflection'],
+    expectedConcepts: [
+      { concept: 'initiative', importance: 'core', synonyms: [] },
+      { concept: 'impact', importance: 'core', synonyms: [] },
+      { concept: 'communication', importance: 'supporting', synonyms: [] },
+      { concept: 'reflection', importance: 'optional', synonyms: [] }
+    ],
     conceptDescriptions: {
       'initiative': 'Proactive action you took.',
       'impact': 'Results achieved.',

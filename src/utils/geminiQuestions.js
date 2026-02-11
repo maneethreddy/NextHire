@@ -20,7 +20,10 @@ const buildPrompt = ({
     'Ensure questions are concise, specific, and relevant to the resume and role.',
     'role must be one of: frontend, backend, fullstack, hr, devops, data, any.',
     'category must be one of: skill, project, hr.',
-    'conceptDescriptions should be an object mapping each expectedConcept to a short explanation.',
+    'expectedConcepts must be an array of objects: { concept, importance, synonyms }.',
+    'importance must be one of: core, supporting, optional.',
+    'synonyms is an optional array of short alternative phrases (empty array is fine).',
+    'conceptDescriptions should be an object mapping each concept to a short explanation.',
     'The resume file is attached as binary data.'
   ];
 
@@ -73,7 +76,25 @@ const normalizeQuestion = (question, index) => {
   if (!text) return null;
 
   const role = Array.isArray(question.role) ? question.role : [question.role || 'any'];
-  const expectedConcepts = Array.isArray(question.expectedConcepts) ? question.expectedConcepts : [];
+  const expectedConceptsRaw = Array.isArray(question.expectedConcepts) ? question.expectedConcepts : [];
+  const expectedConcepts = expectedConceptsRaw
+    .map((item) => {
+      if (!item) return null;
+      if (typeof item === 'string') {
+        return { concept: item, importance: 'supporting', synonyms: [] };
+      }
+      const concept = String(item.concept || '').trim();
+      if (!concept) return null;
+      const importance =
+        item.importance === 'core' || item.importance === 'supporting' || item.importance === 'optional'
+          ? item.importance
+          : 'supporting';
+      const synonyms = Array.isArray(item.synonyms)
+        ? item.synonyms.map((synonym) => String(synonym || '').trim()).filter(Boolean)
+        : [];
+      return { concept, importance, synonyms };
+    })
+    .filter(Boolean);
 
   return {
     questionId,
@@ -96,6 +117,9 @@ const toBase64 = async (file) => {
   });
   return btoa(binary);
 };
+
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const fetchGemini = async ({ prompt, resumeFile }) => {
   const apiKey = getApiKey();
@@ -121,15 +145,48 @@ const fetchGemini = async ({ prompt, resumeFile }) => {
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
-  try {
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts }],
-      generationConfig: { temperature: 0.7 }
-    });
-    return result.response.text();
-  } catch (error) {
-    throw new Error(`Gemini request failed. ${error.message || ''}`.trim());
+  let attempt = 0;
+  const maxRetries = 5; // Increased from 3 to 5 for better resilience
+  let lastError = null;
+
+  while (attempt <= maxRetries) {
+    try {
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts }],
+        generationConfig: { temperature: 0.7 }
+      });
+      return result.response.text();
+    } catch (error) {
+      lastError = error;
+      const errorMessage = error.message || '';
+
+      // Retry on 429 (Resource Exhausted) or 503 (Service Unavailable)
+      const isRetryable = errorMessage.includes('429') || errorMessage.includes('503') || errorMessage.includes('Resource exhausted');
+
+      if (attempt < maxRetries && isRetryable) {
+        attempt++;
+        // Increased backoff: starts at 2s, goes to 64s max with jitter
+        const waitTime = Math.min(Math.pow(2, attempt) * 2000 + Math.random() * 2000, 60000);
+        console.warn(`API rate limited (429). Retry ${attempt}/${maxRetries} in ${Math.round(waitTime / 1000)}s...`);
+        await delay(waitTime);
+        continue;
+      }
+
+      // If we're here, it's either not retryable or we ran out of retries
+      break;
+    }
   }
+
+  const errorMessage = lastError?.message || '';
+  if (errorMessage.includes('429') || errorMessage.includes('Resource exhausted')) {
+    throw new Error(
+      `Gemini API rate limit exhausted after ${attempt} retries. Your API quota may be exceeded. ` +
+      `Please check your API usage at https://console.cloud.google.com/apis/dashboard or ` +
+      `wait a few minutes before trying again.`
+    );
+  }
+
+  throw new Error(`Gemini request failed after ${attempt} attempts. ${lastError?.message || ''}`.trim());
 };
 
 export const generateGeminiQuestions = async (params) => {
@@ -143,5 +200,4 @@ export const generateGeminiQuestions = async (params) => {
   addGeneratedQuestions(normalized);
   return normalized;
 };
-
 
