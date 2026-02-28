@@ -1,16 +1,20 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 const getApiKey = () => import.meta.env.VITE_GEMINI_API_KEY;
 
-const buildPrompt = (resumeText) => [
+const buildPrompt = () => [
   'Return ONLY valid JSON (no markdown, no code fences).',
-  'Output must be a JSON object with keys: skills, projects, experienceLevel.',
-  'skills: array of strings',
-  'projects: array of concise project descriptions',
-  'experienceLevel: "fresher" or "experienced"',
+  'Output must be a JSON object with the following keys:',
+  '- name: string (candidate name)',
+  '- role: string (current or target job title)',
+  '- summary: string (brief professional summary)',
+  '- experience: array of objects { role: string, company: string, duration: string }',
+  '- highlights: array of strings (key achievements or projects)',
+  '- skills: array of strings',
+  '- education: array of objects { degree: string, institution: string, duration: string }',
   'Do NOT include extra keys.',
-  `Resume text: ${resumeText}`
+  'The resume file is attached as binary data.'
 ].join('\n');
 
 const safeParseJsonObject = (text) => {
@@ -33,32 +37,65 @@ const safeParseJsonObject = (text) => {
 };
 
 const normalizeExtracted = (data) => ({
-  skills: Array.isArray(data?.skills) ? data.skills.map((item) => String(item).toLowerCase()) : [],
-  projects: Array.isArray(data?.projects) ? data.projects.map((item) => String(item)) : [],
-  experienceLevel: data?.experienceLevel === 'experienced' ? 'experienced' : 'fresher'
+  name: data?.name || 'Unknown Candidate',
+  role: data?.role || 'Professional',
+  summary: data?.summary || '',
+  experience: Array.isArray(data?.experience) ? data.experience : [],
+  highlights: Array.isArray(data?.highlights) ? data.highlights : [],
+  skills: Array.isArray(data?.skills) ? data.skills : [],
+  education: Array.isArray(data?.education) ? data.education : []
 });
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const extractResumeInsights = async (resumeText) => {
+const toBase64 = async (file) => {
+  const buffer = await file.arrayBuffer();
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
+};
+
+export const extractResumeInsights = async (resumeFile) => {
   const apiKey = getApiKey();
   if (!apiKey) {
     throw new Error('Missing Gemini API key.');
   }
 
-  const prompt = buildPrompt(resumeText);
+  if (!resumeFile) {
+    throw new Error('No resume file provided.');
+  }
+
+  if (resumeFile.size > 4 * 1024 * 1024) {
+    throw new Error('Resume file is too large for Gemini inline upload. Please use a smaller file.');
+  }
+
+  const prompt = buildPrompt();
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
   let text = '';
-  
+
   let attempt = 0;
   const maxRetries = 5;
   let lastError = null;
 
   while (attempt <= maxRetries) {
     try {
+      const data = await toBase64(resumeFile);
+      const parts = [
+        { text: prompt },
+        {
+          inlineData: {
+            mimeType: resumeFile.type || 'application/octet-stream',
+            data
+          }
+        }
+      ];
+
       const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        contents: [{ role: 'user', parts }],
         generationConfig: { temperature: 0.2 }
       });
       text = result.response.text();
@@ -66,9 +103,9 @@ export const extractResumeInsights = async (resumeText) => {
     } catch (error) {
       lastError = error;
       const errorMessage = error.message || '';
-      
+
       const isRetryable = errorMessage.includes('429') || errorMessage.includes('503') || errorMessage.includes('Resource exhausted');
-      
+
       if (attempt < maxRetries && isRetryable) {
         attempt++;
         const waitTime = Math.min(Math.pow(2, attempt) * 2000 + Math.random() * 2000, 60000);
@@ -76,11 +113,11 @@ export const extractResumeInsights = async (resumeText) => {
         await delay(waitTime);
         continue;
       }
-      
+
       break; // Not retryable or max retries reached
     }
   }
-  
+
   if (!text) {
     const errorMessage = lastError?.message || '';
     if (errorMessage.includes('429') || errorMessage.includes('Resource exhausted')) {
@@ -91,7 +128,7 @@ export const extractResumeInsights = async (resumeText) => {
     }
     throw new Error(`Gemini resume extraction failed. ${lastError?.message || ''}`.trim());
   }
-  
+
   const parsed = safeParseJsonObject(text);
 
   if (!parsed) {

@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // API Key directly from .env (since we can't load .env easily in this quick script without dotenv)
-const apiKey = 'AIzaSyBJcStTFrPbtmttX9_4QPGrMPplvfo_y-8';
+const apiKey = 'AIzaSyCdYWd1ZyN8dJchSBgZKhXusVVIrNLbt-0';
 
 const genAI = new GoogleGenerativeAI(apiKey);
 

@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { addGeneratedQuestions } from './storage';
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 const getApiKey = () => import.meta.env.VITE_GEMINI_API_KEY;
 
 const buildPrompt = ({
