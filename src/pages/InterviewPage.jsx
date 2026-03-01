@@ -14,6 +14,7 @@ const InterviewPage = () => {
   const recognitionRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const questionReadyAtRef = useRef(null); // timestamp when TTS finishes (for CLT)
 
   const config = location.state?.config || {};
   // Parse duration from config (e.g., "30 minutes" -> 30)
@@ -34,7 +35,6 @@ const InterviewPage = () => {
   const [answerStartTime, setAnswerStartTime] = useState(null);
   const [typedStartTime, setTypedStartTime] = useState(null);
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(true);
-  const [isGeneratingFollowUp, setIsGeneratingFollowUp] = useState(false);
   const [questionError, setQuestionError] = useState('');
 
   const currentQuestion = questions[currentQuestionIndex];
@@ -51,21 +51,22 @@ const InterviewPage = () => {
       let breakdown = { skill: 0, project: 0, hr: 0 };
 
       try {
-        if (!config.resumeFile) {
-          throw new Error('Resume file missing. Please upload your resume to generate questions.');
-        }
         if (!import.meta.env.VITE_GEMINI_API_KEY) {
           throw new Error('Gemini API key missing. Please set VITE_GEMINI_API_KEY.');
         }
+        // Resume is optional — if provided, Gemini personalises questions from it.
+        // If not, questions are generated purely from Job Position, Experience Level & Difficulty.
         selectedQuestions = await generateGeminiQuestions({
-          resumeFile: config.resumeFile,
+          resumeFile: config.resumeFile || null,
           jobRole: config.jobPosition,
           difficulty: config.difficulty,
+          experienceLevel: config.experienceLevel,
+          duration: config.duration,
           count: totalQuestions
         });
       } catch (error) {
         console.warn('Gemini question generation failed.', error);
-        setQuestionError(error.message || 'Failed to generate questions from resume.');
+        setQuestionError(error.message || 'Failed to generate questions. Please try again.');
       }
 
       if (selectedQuestions.length) {
@@ -230,11 +231,12 @@ const InterviewPage = () => {
           }
         };
 
-        // Stop/pause video when speech ends
+        // Stop/pause video when speech ends — record timestamp for CLT
         utterance.onend = () => {
           if (videoRef.current) {
             videoRef.current.pause();
           }
+          questionReadyAtRef.current = Date.now();
         };
 
         utterance.onerror = () => {
@@ -376,7 +378,8 @@ const InterviewPage = () => {
     currentAnswers[currentQuestionIndex] = {
       text: trimmed,
       startedAt,
-      endedAt: Date.now()
+      endedAt: Date.now(),
+      questionReadyAt: questionReadyAtRef.current // for CLT calculation
     };
 
     setAnswers(currentAnswers);
@@ -403,30 +406,42 @@ const InterviewPage = () => {
     setAnswerStartTime(null);
   };
 
-  const handleGenerateFollowUp = async () => {
-    if (!currentQuestion || !answers[currentQuestionIndex]?.text) return;
-    setIsGeneratingFollowUp(true);
+  const handleRetryQuestion = () => {
+    // Clear the current answer so the user can re-record
+    const updatedAnswers = [...answers];
+    updatedAnswers[currentQuestionIndex] = null;
+    setAnswers(updatedAnswers);
+    setAnswer('');
+    setAnswerStartTime(null);
+    setTypedStartTime(null);
 
-    try {
-      const followUps = await generateGeminiQuestions({
-        resumeFile: config.resumeFile,
-        jobRole: config.jobPosition,
-        difficulty: config.difficulty,
-        count: 1,
-        mode: 'followup',
-        previousQuestions: [currentQuestion.text],
-        previousAnswers: [answers[currentQuestionIndex].text]
-      });
+    // Re-read the question via TTS
+    if (currentQuestion?.text && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const voices = window.speechSynthesis.getVoices();
+      const femaleVoice = voices.find(v =>
+        v.name.toLowerCase().includes('samantha') ||
+        v.name.toLowerCase().includes('karen') ||
+        v.name.toLowerCase().includes('zira') ||
+        (v.lang.startsWith('en') && v.name.includes('Female'))
+      ) || voices.find(v => v.lang.startsWith('en'));
 
-      if (followUps.length) {
-        const updatedQuestions = [...questions];
-        updatedQuestions.splice(currentQuestionIndex + 1, 0, ...followUps);
-        setQuestions(updatedQuestions);
-      }
-    } catch (error) {
-      console.warn('Failed to generate follow-up question.', error);
-    } finally {
-      setIsGeneratingFollowUp(false);
+      const utterance = new SpeechSynthesisUtterance(currentQuestion.text);
+      utterance.rate = 0.9;
+      if (femaleVoice) utterance.voice = femaleVoice;
+
+      utterance.onstart = () => {
+        if (videoRef.current) { videoRef.current.currentTime = 0; videoRef.current.play(); }
+      };
+      utterance.onend = () => {
+        if (videoRef.current) videoRef.current.pause();
+        questionReadyAtRef.current = Date.now();
+      };
+      utterance.onerror = () => {
+        if (videoRef.current) videoRef.current.pause();
+      };
+
+      window.speechSynthesis.speak(utterance);
     }
   };
 
@@ -558,92 +573,77 @@ const InterviewPage = () => {
 
   return (
     <div className="relative w-full h-screen bg-[#060010] overflow-hidden flex flex-col">
-      {/* Top Left - EXIT and Timer */}
-      <div className="absolute top-6 left-6 flex items-center gap-4 z-50">
-        {/* EXIT Button */}
-        <button
-          onClick={handleExit}
-          className="exit-button"
-        >
-          <X className="w-5 h-5" />
-          <span>EXIT</span>
-        </button>
 
-        {/* Timer (Countdown) */}
+      {/* ── Top Bar: Exit + Timer ── */}
+      <div className="interview-top-bar">
+        <button onClick={handleExit} className="exit-button">
+          <X className="w-4 h-4" />
+          <span>Exit</span>
+        </button>
         <div className="timer-display">
+          <span className="timer-dot" />
           {formatTime(timeRemaining)}
         </div>
       </div>
 
-      {/* Video Panels Section - 50/50 Split with Equal Heights */}
-      <div className="flex-1 flex items-stretch gap-4 px-4 pt-20 pb-4">
-        {/* Main Interview Video - Left Half */}
+      {/* ── Video Panels ── */}
+      <div className="interview-videos">
         <div className="flex-1 flex items-center justify-center">
-          <video
-            ref={videoRef}
-            muted
-            playsInline
-            className="interview-video-split"
-          >
+          <video ref={videoRef} muted playsInline className="interview-video-split">
             <source src={interviewVideo} type="video/mp4" />
           </video>
         </div>
-
-        {/* User Video - Right Half */}
         <div className="flex-1 flex items-center justify-center">
-          <video
-            ref={userVideoRef}
-            autoPlay
-            playsInline
-            muted
-            className="user-video-split"
-          />
+          <video ref={userVideoRef} autoPlay playsInline muted className="user-video-split" />
         </div>
       </div>
 
-      {/* START/STOP ANSWER Button - Centered below videos */}
-      <div className="flex justify-center py-4 z-50">
+      {/* ── Start / Stop Answer ── */}
+      <div className="interview-answer-btn-row">
         {!isRecording ? (
-          <button
-            onClick={handleStartAnswer}
-            className="start-answer-button"
-          >
-            <Mic className="w-6 h-6" />
-            <span>START ANSWER</span>
+          <button onClick={handleStartAnswer} className="start-answer-button">
+            <Mic className="w-5 h-5" />
+            <span>Start Answer</span>
           </button>
         ) : (
-          <button
-            onClick={handleStopAnswer}
-            className="stop-answer-button"
-          >
+          <button onClick={handleStopAnswer} className="stop-answer-button">
             <div className="recording-indicator" />
-            <span>STOP ANSWER</span>
+            <span>Stop Answer</span>
           </button>
         )}
       </div>
 
-      {/* Question Section - Bottom */}
-      <div className="px-6 pb-6 z-50">
+      {/* ── Question Section ── */}
+      <div className="interview-question-section">
         <div className="question-container">
-          <div className="flex items-center justify-between mb-4">
+
+          {/* Header row: question # + action buttons */}
+          <div className="question-header-row">
             <h3 className="question-heading">Question {currentQuestionIndex + 1} of {questions.length}</h3>
-            {!isRecording && (answer || answers[currentQuestionIndex]?.text) && currentQuestionIndex < questions.length - 1 && (
-              <button
-                onClick={handleNextQuestion}
-                className="next-question-button"
-              >
-                Next Question →
-              </button>
-            )}
-            {!isRecording && currentQuestionIndex === questions.length - 1 && (
-              <button
-                onClick={handleFinishInterview}
-                className="finish-interview-button"
-              >
-                Finish Interview →
-              </button>
-            )}
+
+            <div className="question-actions">
+              {/* Retry (left of Next) — visible when answer exists */}
+              {!isRecording && (answer || answers[currentQuestionIndex]?.text) && (
+                <button onClick={handleRetryQuestion} className="retry-button">
+                  ↻ Retry
+                </button>
+              )}
+
+              {/* Next / Finish */}
+              {!isRecording && (answer || answers[currentQuestionIndex]?.text) && currentQuestionIndex < questions.length - 1 && (
+                <button onClick={handleNextQuestion} className="next-question-button">
+                  Next Question →
+                </button>
+              )}
+              {!isRecording && currentQuestionIndex === questions.length - 1 && (
+                <button onClick={handleFinishInterview} className="finish-interview-button">
+                  Finish Interview →
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Question text */}
           <p className="question-text">
             {questionError
               ? questionError
@@ -651,32 +651,24 @@ const InterviewPage = () => {
                 ? 'Generating personalized questions from your resume...'
                 : currentQuestion?.text || 'Preparing your interview...'}
           </p>
+
+          {/* Answer textarea */}
           <textarea
             value={answer}
             onChange={(event) => {
-              if (!typedStartTime) {
-                setTypedStartTime(Date.now());
-              }
+              if (!typedStartTime) setTypedStartTime(Date.now());
               setAnswer(event.target.value);
             }}
             disabled={isRecording}
-            placeholder={isRecording ? 'Listening... Speak your answer' : 'Type or speak your answer here'}
+            placeholder={isRecording ? 'Listening… Speak your answer' : 'Type or speak your answer here'}
             className="answer-input"
           />
           {!answer && !isRecording && !answers[currentQuestionIndex]?.text && (
             <p className="answer-placeholder">Your answer will appear here</p>
           )}
-          {!isRecording && answers[currentQuestionIndex]?.text && (
-            <button
-              onClick={handleGenerateFollowUp}
-              className="next-question-button"
-              disabled={isGeneratingFollowUp}
-            >
-              {isGeneratingFollowUp ? 'Generating Follow-up...' : 'Generate Follow-up'}
-            </button>
-          )}
         </div>
       </div>
+
     </div>
   );
 };

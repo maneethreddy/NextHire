@@ -17,11 +17,8 @@ export const normalizeRole = (roleLabel) => {
 };
 
 export const getQuestionCountFromDuration = (durationLabel) => {
-  const durationMatch = durationLabel?.match(/(\d+)/);
-  const totalMinutes = durationMatch ? Number.parseInt(durationMatch[1], 10) : 30;
-  if (totalMinutes <= 15) return 4;
-  if (totalMinutes <= 30) return 6;
-  return 8;
+  const mins = parseInt(durationLabel?.match(/\d+/)?.[0] || '30', 10);
+  return Math.max(3, Math.round(mins / 4));
 };
 
 const roleMatches = (questionRole, targetRole) => {

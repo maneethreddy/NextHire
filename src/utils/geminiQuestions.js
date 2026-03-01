@@ -4,10 +4,47 @@ import { addGeneratedQuestions } from './storage';
 const GEMINI_MODEL = 'gemini-2.5-flash';
 const getApiKey = () => import.meta.env.VITE_GEMINI_API_KEY;
 
+// ── Question count: ~1 question per 4 minutes, minimum 3 ──────────────
+const getSchedule = (durationLabel = '30') => {
+  const mins = parseInt(durationLabel?.match(/\d+/)?.[0] || '30', 10);
+  const total = Math.max(3, Math.round(mins / 4));
+  const hr = 1;
+  const project = Math.max(1, Math.round(total * 0.25)); // ~25% project
+  const skill = Math.max(1, total - project - hr);      // rest = skill
+  return { total, skill, project, hr };
+};
+
+// ── Experience-level depth instruction ───────────────────────────────
+const getDepthInstruction = (experienceLevel = '') => {
+  const l = experienceLevel.toLowerCase();
+  if (l.includes('intern'))
+    return 'Questions must be conceptual and definition-level only. No implementation details, no architecture. Focus on "what is" and "why".';
+  if (l.includes('fresher'))
+    return 'Questions should be basic implementation level. Avoid advanced architecture or system design. Focus on fundamentals and simple usage.';
+  if (l.includes('junior'))
+    return 'Mix of basic and intermediate questions. One moderately complex scenario is acceptable. Focus on practical coding and debugging.';
+  if (l.includes('mid') || l.includes('middle'))
+    return 'Practical implementation questions with tradeoffs. Include one system design or architecture question.';
+  if (l.includes('senior') || l.includes('experienced'))
+    return 'Advanced questions on architecture, scalability, design patterns, and optimisation. Include system design and open-ended problems.';
+  return 'Balanced mix of conceptual and practical questions.';
+};
+
+// ── Difficulty flavour ────────────────────────────────────────────────
+const getDifficultyFlavour = (difficulty = '') => {
+  const d = difficulty.toLowerCase();
+  if (d === 'easy') return 'Focus on fundamental concepts, syntax, and definitions. Questions should be answerable in 1–2 sentences.';
+  if (d === 'hard') return 'Focus on design problems, edge cases, optimisation, and system thinking. Questions should require deep reasoning.';
+  return 'Focus on practical scenarios, tradeoffs, and intermediate-level implementation.';
+};
+
 const buildPrompt = ({
   jobRole,
   difficulty,
   count,
+  experienceLevel,
+  duration,
+  hasResume,
   mode,
   previousQuestions,
   previousAnswers
@@ -17,35 +54,52 @@ const buildPrompt = ({
     'The output must be a JSON array of question objects.',
     'Each question object must include: questionId, text, skillTags, role, difficulty, expectedConcepts, conceptDescriptions, category.',
     'Do NOT include answers or hints.',
-    'Ensure questions are concise, specific, and relevant to the resume and role.',
+    'Ensure questions are concise, specific, and relevant to the role.',
     'role must be one of: frontend, backend, fullstack, hr, devops, data, any.',
     'category must be one of: skill, project, hr.',
     'expectedConcepts must be an array of objects: { concept, importance, synonyms }.',
     'importance must be one of: core, supporting, optional.',
     'synonyms is an optional array of short alternative phrases (empty array is fine).',
     'conceptDescriptions should be an object mapping each concept to a short explanation.',
-    'The resume file is attached as binary data.'
-  ];
-
-  const contextLines = [
-    `Job role: ${jobRole}`,
-    `Difficulty: ${difficulty || 'mixed'}`
+    ...(hasResume ? ['The resume file is attached as binary data.'] : [])
   ];
 
   if (mode === 'followup') {
-    contextLines.push(`Previous questions: ${JSON.stringify(previousQuestions || [])}`);
-    contextLines.push(`User answers (summary): ${JSON.stringify(previousAnswers || [])}`);
     return [
       ...baseRules,
-      `Generate ${count || 2} follow-up interview questions that build on the previous question(s) or answer(s).`,
-      ...contextLines
+      `Generate ${count || 1} follow-up interview questions that build on the previous question(s) or answer(s).`,
+      `Job role: ${jobRole}`,
+      `Difficulty: ${difficulty || 'medium'}`,
+      `Previous questions: ${JSON.stringify(previousQuestions || [])}`,
+      `User answers: ${JSON.stringify(previousAnswers || [])}`
     ].join('\n');
   }
 
+  const schedule = getSchedule(duration);
+  const total = count || schedule.total;
+  const depthInstruction = getDepthInstruction(experienceLevel);
+  const difficultyFlavour = getDifficultyFlavour(difficulty);
+
+  const tailoringInstruction = hasResume
+    ? 'Tailor at least 60% of questions directly to the skills and projects found in the attached resume.'
+    : `Generate standard ${jobRole} interview questions relevant to the experience level and difficulty. Do NOT mention a resume.`;
+
   return [
     ...baseRules,
-    `Generate ${count || 6} interview questions balanced across skills, projects, and one HR question.`,
-    ...contextLines
+    '',
+    `Generate exactly ${total} interview questions for a ${jobRole} candidate with the following distribution:`,
+    `  - ${schedule.skill} skill/technical questions (category: skill)`,
+    `  - ${schedule.project} project/scenario-based questions (category: project)`,
+    `  - ${schedule.hr} HR/behavioural question (category: hr)`,
+    '',
+    `Experience level: ${experienceLevel || 'not specified'}`,
+    `Depth instruction: ${depthInstruction}`,
+    '',
+    `Difficulty: ${difficulty || 'medium'}`,
+    `Difficulty flavour: ${difficultyFlavour}`,
+    '',
+    `Job role: ${jobRole}`,
+    tailoringInstruction
   ].join('\n');
 };
 
@@ -190,7 +244,8 @@ const fetchGemini = async ({ prompt, resumeFile }) => {
 };
 
 export const generateGeminiQuestions = async (params) => {
-  const prompt = buildPrompt(params);
+  const hasResume = !!params.resumeFile;
+  const prompt = buildPrompt({ ...params, hasResume });
   const responseText = await fetchGemini({ prompt, resumeFile: params.resumeFile });
   const parsed = safeParseJsonArray(responseText);
   const normalized = parsed
