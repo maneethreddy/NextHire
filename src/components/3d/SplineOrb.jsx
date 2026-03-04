@@ -19,7 +19,7 @@ const SplineOrb = () => {
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%' }}>
       {/* @ts-ignore */}
-      <spline-viewer 
+      <spline-viewer
         url="https://prod.spline.design/ppX8QXY8idjB-Dni/scene.splinecode"
         style={{ width: '100%', height: '100%', display: 'block' }}
       />

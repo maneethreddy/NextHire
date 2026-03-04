@@ -117,7 +117,7 @@ const InterviewPage = () => {
           audio: true
         });
         setUserStream(stream);
-        if (userVideoRef.current) {
+        if (userVideoRef.current && stream) {
           userVideoRef.current.srcObject = stream;
         }
       } catch (error) {
@@ -572,8 +572,24 @@ const InterviewPage = () => {
   }
 
   return (
-    <div className="relative w-full h-screen bg-[#060010] overflow-hidden flex flex-col">
+    <div className="relative w-full h-screen bg-[#060010] overflow-hidden flex flex-col font-sans">
 
+      {/* Animated background orbs (from Login/Home) */}
+      <div className="login-orb login-orb-1 opacity-40" />
+      <div className="login-orb login-orb-2 opacity-30" />
+      <div className="login-orb login-orb-3 opacity-20" />
+      <div className="login-grid-overlay" />
+
+      {/* ── Video Panels (Picture-in-Picture) ── */}
+      <div className="interview-videos">
+        {/* Full background AI video */}
+        <video ref={videoRef} muted playsInline className="interview-video-split">
+          <source src={interviewVideo} type="video/mp4" />
+        </video>
+
+        {/* Floating User Webcam */}
+        <video ref={userVideoRef} autoPlay playsInline muted className="user-video-split" />
+      </div>
       {/* ── Top Bar: Exit + Timer ── */}
       <div className="interview-top-bar">
         <button onClick={handleExit} className="exit-button">
@@ -586,32 +602,9 @@ const InterviewPage = () => {
         </div>
       </div>
 
-      {/* ── Video Panels ── */}
-      <div className="interview-videos">
-        <div className="flex-1 flex items-center justify-center">
-          <video ref={videoRef} muted playsInline className="interview-video-split">
-            <source src={interviewVideo} type="video/mp4" />
-          </video>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <video ref={userVideoRef} autoPlay playsInline muted className="user-video-split" />
-        </div>
-      </div>
 
-      {/* ── Start / Stop Answer ── */}
-      <div className="interview-answer-btn-row">
-        {!isRecording ? (
-          <button onClick={handleStartAnswer} className="start-answer-button">
-            <Mic className="w-5 h-5" />
-            <span>Start Answer</span>
-          </button>
-        ) : (
-          <button onClick={handleStopAnswer} className="stop-answer-button">
-            <div className="recording-indicator" />
-            <span>Stop Answer</span>
-          </button>
-        )}
-      </div>
+
+
 
       {/* ── Question Section ── */}
       <div className="interview-question-section">
@@ -663,9 +656,21 @@ const InterviewPage = () => {
             placeholder={isRecording ? 'Listening… Speak your answer' : 'Type or speak your answer here'}
             className="answer-input"
           />
-          {!answer && !isRecording && !answers[currentQuestionIndex]?.text && (
-            <p className="answer-placeholder">Your answer will appear here</p>
-          )}
+
+          {/* Action Row inside container: Start/Stop Answer aligned center */}
+          <div className="flex justify-center mt-6">
+            {!isRecording ? (
+              <button onClick={handleStartAnswer} className="start-answer-button">
+                <Mic className="w-5 h-5" />
+                <span>Start Answer</span>
+              </button>
+            ) : (
+              <button onClick={handleStopAnswer} className="stop-answer-button">
+                <div className="recording-indicator" />
+                <span>Stop Answer</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

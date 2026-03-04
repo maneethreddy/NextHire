@@ -4,6 +4,7 @@ import { ArrowLeft, Briefcase, User, Gauge, Clock, FastForward, FileText, CheckC
 import { experienceLevels, jobRoles, difficultyLevels, durations } from '../utils/configure';
 import { listGeminiModels } from '../utils/geminiModels';
 import { extractResumeInsights } from '../utils/geminiResume';
+import Logo from '../assets/Logo.png';
 
 const ConfigurePage = () => {
   const navigate = useNavigate();
@@ -84,12 +85,6 @@ const ConfigurePage = () => {
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Home</span>
         </button>
-        <div className="configure-navbar-brand">
-          <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-red-500 rounded-lg flex items-center justify-center">
-            <FastForward className="w-4 h-4 fill-white" />
-          </div>
-          <span className="text-lg font-bold">NextHire</span>
-        </div>
       </div>
 
       {/* Main Content */}

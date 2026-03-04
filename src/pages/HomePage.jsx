@@ -1,11 +1,41 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SplineOrb from '../components/3d/SplineOrb';
 import { ArrowRight, CheckCircle2, Brain, TrendingUp, Target, Zap, FastForward } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import Logo from '../assets/Logo.png';
+import '../styles/ProfileDropdown.css';
 
 const HomePage = () => {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [activeNav, setActiveNav] = useState('home');
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [particles, setParticles] = useState([]);
+  const profileRef = useRef(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  useEffect(() => {
+    const generated = Array.from({ length: 30 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: Math.random() * 3 + 1,
+      delay: Math.random() * 5,
+      duration: Math.random() * 10 + 8,
+    }));
+    setParticles(generated);
+  }, []);
 
   const features = [
     {
@@ -30,14 +60,57 @@ const HomePage = () => {
     }
   ];
 
+  // Initials avatar helper
+  const getInitials = (name) => {
+    if (!name) return '?';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const handleProfileClick = () => {
+    if (!user) {
+      navigate('/login');
+    } else {
+      setProfileOpen((v) => !v);
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    setProfileOpen(false);
+  };
+
   return (
-    <div className="min-h-screen bg-[#060010] text-white">
+    <div className="min-h-screen bg-[#060010] text-white relative overflow-hidden">
+      {/* Animated background orbs */}
+      <div className="login-orb login-orb-1 opacity-40" />
+      <div className="login-orb login-orb-2 opacity-30" />
+      <div className="login-orb login-orb-3 opacity-20" />
+
+      {/* Floating particles */}
+      {particles.map((p) => (
+        <span
+          key={p.id}
+          className="login-particle"
+          style={{
+            left: `${p.x}%`,
+            top: `${p.y}%`,
+            width: `${p.size}px`,
+            height: `${p.size}px`,
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${p.duration}s`,
+          }}
+        />
+      ))}
+
+      {/* Grid overlay */}
+      <div className="login-grid-overlay" />
+
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#060010]/95 backdrop-blur-2xl border-b border-white/10 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center shadow-lg shadow-red-500/30">
-              <span className="text-white font-bold text-xl">→</span>
+            <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center shadow-lg shadow-red-500/30 bg-black/20">
+              <img src={Logo} alt="NextHire Logo" className="w-full h-full object-contain" />
             </div>
             <span className="text-2xl font-bold tracking-tight">NextHire</span>
           </div>
@@ -64,15 +137,54 @@ const HomePage = () => {
             >
               How It Works
             </a>
-            <button
-              onClick={() => navigate('/configure')}
-              className="start-interview-button"
-            >
-              <span className="start-interview-text">Start Interview</span>
-              <div className="start-interview-icon">
-                <FastForward className="w-5 h-5" fill="white" />
-              </div>
-            </button>
+            {/* ── Profile icon ── */}
+            <div className="profile-wrapper" ref={profileRef}>
+              <button
+                className={`profile-avatar-btn ${user ? 'profile-avatar-btn-signed' : ''}`}
+                onClick={handleProfileClick}
+                aria-label={user ? 'Account menu' : 'Sign in'}
+                id="profile-avatar-btn"
+              >
+                {user ? (
+                  <span className="profile-initials">{getInitials(user.name)}</span>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                )}
+                {user && <span className="profile-online-dot" />}
+              </button>
+
+              {/* Dropdown */}
+              {user && profileOpen && (
+                <div className="profile-dropdown">
+                  <div className="profile-dropdown-header">
+                    <div className="profile-dropdown-avatar">
+                      <span>{getInitials(user.name)}</span>
+                    </div>
+                    <div className="profile-dropdown-info">
+                      <span className="profile-dropdown-name">{user.name}</span>
+                      <span className="profile-dropdown-email">{user.email}</span>
+                    </div>
+                  </div>
+                  <div className="profile-dropdown-divider" />
+                  <button className="profile-dropdown-item" onClick={() => { setProfileOpen(false); navigate('/configure'); }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
+                    Start Interview
+                  </button>
+                  <button className="profile-dropdown-item" onClick={() => setProfileOpen(false)}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                    My Profile
+                  </button>
+                  <div className="profile-dropdown-divider" />
+                  <button className="profile-dropdown-item profile-dropdown-logout" onClick={handleLogout}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </nav>
@@ -88,7 +200,7 @@ const HomePage = () => {
                 <span className="bg-gradient-to-r from-red-400 to-pink-400 bg-clip-text text-transparent"> Interviews</span>
               </h1>
               <p className="text-xl text-gray-400 mb-8 leading-relaxed">
-                AI-powered mock interviews with research-grade evaluation. Get personalized feedback on Answer Gap Intelligence, 
+                AI-powered mock interviews with research-grade evaluation. Get personalized feedback on Answer Gap Intelligence,
                 Interview Robustness Index, and more.
               </p>
               <button
@@ -146,21 +258,9 @@ const HomePage = () => {
           </div>
           <div className="grid md:grid-cols-3 gap-12">
             {[
-              {
-                step: '1',
-                title: 'Configure Your Interview',
-                description: 'Select your experience level, job role, difficulty, and duration'
-              },
-              {
-                step: '2',
-                title: 'Practice in Real-Time',
-                description: 'Answer technical questions with AI-powered follow-up probing'
-              },
-              {
-                step: '3',
-                title: 'Get Detailed Analytics',
-                description: 'Receive comprehensive feedback with AGI, IRI, TAI, ACE, and EDD metrics'
-              }
+              { step: '1', title: 'Configure Your Interview', description: 'Select your experience level, job role, difficulty, and duration' },
+              { step: '2', title: 'Practice in Real-Time', description: 'Answer technical questions with AI-powered follow-up probing' },
+              { step: '3', title: 'Get Detailed Analytics', description: 'Receive comprehensive feedback with AGI, IRI, TAI, ACE, and EDD metrics' }
             ].map((item, index) => (
               <div key={index} className="text-center">
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center mx-auto mb-8 text-3xl font-bold shadow-lg shadow-red-500/30">

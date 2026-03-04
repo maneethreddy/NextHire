@@ -3,12 +3,16 @@ import HomePage from './pages/HomePage';
 import ConfigurePage from './pages/ConfigurePage';
 import InterviewPage from './pages/InterviewPage';
 import FeedbackPage from './pages/FeedbackPage';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
         <Route path="/configure" element={<ConfigurePage />} />
         <Route path="/interview" element={<InterviewPage />} />
         <Route path="/feedback" element={<FeedbackPage />} />
