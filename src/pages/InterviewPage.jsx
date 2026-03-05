@@ -129,9 +129,30 @@ const InterviewPage = () => {
 
     // Cleanup: stop all tracks when component unmounts
     return () => {
-      stopAllTracks();
+      // Intentionally not stopping tracks here if we want them to survive re-renders.
+      // But we have stopAllTracks elsewhere.
     };
-  }, []);
+  }, []); // Run once on mount
+
+  // Ensure stream is attached to the video element once it mounts (after loading state)
+  useEffect(() => {
+    if (userVideoRef.current && userStream) {
+      if (userVideoRef.current.srcObject !== userStream) {
+        userVideoRef.current.srcObject = userStream;
+        // Explicitly play it just in case autoPlay didn't catch the late SRC change
+        userVideoRef.current.play().catch((err) => console.log('Video play error:', err));
+      }
+    }
+  }, [userStream, isGeneratingQuestions]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (userStream) {
+        userStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [userStream]);
 
   // Stop all media tracks
   const stopAllTracks = () => {
