@@ -383,10 +383,16 @@ const InterviewPage = () => {
           recognitionRef.current.start();
         } catch (error) {
           console.error('Error starting speech recognition:', error);
+          alert('Could not start speech recognition. Please ensure you have granted microphone permissions.');
+          setIsRecording(false);
         }
+      } else {
+        alert('Speech recognition is not supported in this browser or over an insecure connection. Please use Chrome/Edge and ensure you are using HTTPS or localhost.');
+        setIsRecording(false);
       }
     } catch (error) {
       console.error('Error starting recording:', error);
+      alert('Error starting recording. Please check your microphone permissions and ensure you are using a secure connection.');
       setIsRecording(false);
     }
   };
