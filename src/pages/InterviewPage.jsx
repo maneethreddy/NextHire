@@ -25,6 +25,7 @@ const InterviewPage = () => {
   const [sessionId] = useState(() => crypto.randomUUID());
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [permissionError, setPermissionError] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(totalDuration * 60); // in seconds (countdown)
   const [isRecording, setIsRecording] = useState(false);
   const [answer, setAnswer] = useState('');
@@ -117,11 +118,14 @@ const InterviewPage = () => {
           audio: true
         });
         setUserStream(stream);
+        setPermissionError(false);
         if (userVideoRef.current && stream) {
           userVideoRef.current.srcObject = stream;
         }
       } catch (error) {
         console.error('Error accessing webcam/microphone:', error);
+        setPermissionError(true);
+        alert('Camera and Microphone permissions are required to start the interview. Please allow access in your browser settings and refresh the page.');
       }
     };
 
@@ -529,6 +533,24 @@ const InterviewPage = () => {
     const audio = new Audio(audioUrl);
     audio.play();
   };
+
+  // Permission Error Screen
+  if (permissionError) {
+    return (
+      <div className="min-h-screen bg-[#060010] flex flex-col items-center justify-center text-white p-4 text-center">
+        <h2 className="text-3xl font-bold mb-3 text-red-500">Camera & Microphone Access Required</h2>
+        <p className="text-gray-400 text-lg max-w-md mb-8">
+          We need access to your camera and microphone to conduct the AI interview. Please allow permissions in your browser settings (look for the lock icon in the address bar).
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-6 py-3 bg-pink-600 rounded-lg font-semibold hover:bg-pink-700 transition"
+        >
+          Refresh Page
+        </button>
+      </div>
+    );
+  }
 
   // Loading Screen
   if (isGeneratingQuestions) {
