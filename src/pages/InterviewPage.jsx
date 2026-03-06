@@ -256,6 +256,7 @@ const InterviewPage = () => {
         utterance.onend = () => {
           if (videoRef.current) {
             videoRef.current.pause();
+            videoRef.current.currentTime = 7.1; // Return to rest position
           }
           questionReadyAtRef.current = Date.now();
         };
@@ -263,6 +264,7 @@ const InterviewPage = () => {
         utterance.onerror = () => {
           if (videoRef.current) {
             videoRef.current.pause();
+            videoRef.current.currentTime = 7.1; // Return to rest position
           }
         };
 
@@ -455,11 +457,17 @@ const InterviewPage = () => {
         if (videoRef.current) { videoRef.current.currentTime = 0; videoRef.current.play(); }
       };
       utterance.onend = () => {
-        if (videoRef.current) videoRef.current.pause();
+        if (videoRef.current) {
+          videoRef.current.pause();
+          videoRef.current.currentTime = 0; // Return to rest position
+        }
         questionReadyAtRef.current = Date.now();
       };
       utterance.onerror = () => {
-        if (videoRef.current) videoRef.current.pause();
+        if (videoRef.current) {
+          videoRef.current.pause();
+          videoRef.current.currentTime = 0; // Return to rest position
+        }
       };
 
       window.speechSynthesis.speak(utterance);
@@ -604,7 +612,7 @@ const InterviewPage = () => {
       {/* ── Video Panels (Picture-in-Picture) ── */}
       <div className="interview-videos">
         {/* Full background AI video */}
-        <video ref={videoRef} muted playsInline className="interview-video-split">
+        <video ref={videoRef} muted playsInline loop className="interview-video-split">
           <source src={interviewVideo} type="video/mp4" />
         </video>
 
