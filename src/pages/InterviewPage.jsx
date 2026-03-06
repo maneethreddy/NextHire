@@ -356,9 +356,8 @@ const InterviewPage = () => {
     try {
       // Start MediaRecorder for audio recording
       if (userStream) {
-        const mediaRecorder = new MediaRecorder(userStream, {
-          mimeType: 'audio/webm;codecs=opus'
-        });
+        // Let the browser automatically choose the best supported MIME type
+        const mediaRecorder = new MediaRecorder(userStream);
 
         mediaRecorderRef.current = mediaRecorder;
 
@@ -369,7 +368,7 @@ const InterviewPage = () => {
         };
 
         mediaRecorder.onstop = () => {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || 'audio/webm' });
           const audioUrl = URL.createObjectURL(audioBlob);
 
           // Store audio recording
@@ -396,7 +395,7 @@ const InterviewPage = () => {
       }
     } catch (error) {
       console.error('Error starting recording:', error);
-      alert('Error starting recording. Please check your microphone permissions and ensure you are using a secure connection.');
+      alert(`Error starting recording (${error.message || error.name}). Please check if your browser supports the recording format.`);
       setIsRecording(false);
     }
   };
