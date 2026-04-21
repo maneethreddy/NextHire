@@ -1,92 +1,121 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-
-// Default account that always exists
-const DEFAULT_USER = {
-    email: 'test123@gmail.com',
-    password: 'test123',
-    name: 'Test User',
-    avatar: null,
-};
+import {
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    signInWithPopup,
+    signOut as firebaseSignOut,
+    updateProfile
+} from 'firebase/auth';
+import { auth, googleProvider } from '../services/firebase';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
+    const [authInitialized, setAuthInitialized] = useState(false);
 
-    // Load persisted session on mount
     useEffect(() => {
-        try {
-            const stored = localStorage.getItem('nh_session');
-            if (stored) setUser(JSON.parse(stored));
-        } catch {
-            /* ignore */
+        if (!auth) {
+            console.warn('Firebase Auth is not available. Skipping onAuthStateChanged.');
+            setAuthInitialized(true);
+            return;
         }
+
+        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+            if (firebaseUser) {
+                setUser({
+                    uid: firebaseUser.uid,
+                    email: firebaseUser.email,
+                    name: firebaseUser.displayName || 'User',
+                    avatar: firebaseUser.photoURL || null,
+                });
+            } else {
+                setUser(null);
+            }
+            setAuthInitialized(true);
+        });
+
+        return () => unsubscribe();
     }, []);
 
     /** Returns { ok, error } */
-    const login = (email, password) => {
-        // Check default credentials
-        const defaultMatch =
-            email === DEFAULT_USER.email && password === DEFAULT_USER.password;
-
-        if (defaultMatch) {
-            const sessionUser = {
-                email: DEFAULT_USER.email,
-                name: DEFAULT_USER.name,
-                avatar: null,
-            };
-            localStorage.setItem('nh_session', JSON.stringify(sessionUser));
-            setUser(sessionUser);
-            return { ok: true };
-        }
-
-        // Check registered accounts
+    const login = async (email, password) => {
+        if (!auth) return { ok: false, error: 'Auth system unavailable (check Firebase config).' };
         try {
-            const accounts = JSON.parse(localStorage.getItem('nh_accounts') || '[]');
-            const found = accounts.find(
-                (a) => a.email === email && a.password === password
-            );
-            if (found) {
-                const sessionUser = { email: found.email, name: found.name, avatar: null };
-                localStorage.setItem('nh_session', JSON.stringify(sessionUser));
-                setUser(sessionUser);
-                return { ok: true };
+            await signInWithEmailAndPassword(auth, email, password);
+            return { ok: true };
+        } catch (error) {
+            let errorMsg = 'Invalid email or password.';
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                errorMsg = 'Invalid email or password.';
+            } else if (error.code === 'auth/too-many-requests') {
+                errorMsg = 'Too many attempts. Try again later.';
+            } else {
+                errorMsg = error.message;
             }
-        } catch {
-            /* ignore */
+            return { ok: false, error: errorMsg };
         }
-
-        return { ok: false, error: 'Invalid email or password.' };
     };
 
     /** Returns { ok, error } */
-    const signup = (name, email, password) => {
-        if (email === DEFAULT_USER.email) {
-            return { ok: false, error: 'Email already exists.' };
+    const signup = async (name, email, password) => {
+        if (!auth) return { ok: false, error: 'Auth system unavailable (check Firebase config).' };
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            // Optionally set the display name right after signup
+            if (userCredential.user) {
+                await updateProfile(userCredential.user, { displayName: name });
+                // Force an immediate local state update so the UI gets the name without a refresh
+                setUser((prev) => prev ? { ...prev, name } : null);
+            }
+            return { ok: true };
+        } catch (error) {
+            let errorMsg = 'Something went wrong.';
+            if (error.code === 'auth/email-already-in-use') {
+                errorMsg = 'Email already exists. Please log in.';
+            } else if (error.code === 'auth/weak-password') {
+                errorMsg = 'Password is too weak. Must be at least 6 characters.';
+            } else {
+                errorMsg = error.message;
+            }
+            return { ok: false, error: errorMsg };
+        }
+    };
+
+    const logout = async () => {
+        if (!auth) return;
+        try {
+            await firebaseSignOut(auth);
+        } catch (error) {
+            console.error('Logout failed', error);
+        }
+    };
+
+    /** Real Google Login */
+    const googleLogin = async () => {
+        if (!auth || !googleProvider) {
+            return { ok: false, error: 'Google Sign-In is unavailable (check Firebase config).' };
         }
         try {
-            const accounts = JSON.parse(localStorage.getItem('nh_accounts') || '[]');
-            if (accounts.find((a) => a.email === email)) {
-                return { ok: false, error: 'Email already exists.' };
-            }
-            accounts.push({ name, email, password });
-            localStorage.setItem('nh_accounts', JSON.stringify(accounts));
-            const sessionUser = { email, name, avatar: null };
-            localStorage.setItem('nh_session', JSON.stringify(sessionUser));
-            setUser(sessionUser);
+            await signInWithPopup(auth, googleProvider);
             return { ok: true };
-        } catch {
-            return { ok: false, error: 'Something went wrong.' };
+        } catch (error) {
+            if (error.code === 'auth/popup-closed-by-user') {
+                return { ok: false, error: 'Sign in was cancelled.' };
+            }
+            return { ok: false, error: error.message };
         }
     };
 
-    const logout = () => {
-        localStorage.removeItem('nh_session');
-        setUser(null);
-    };
+    // Don't render children until the first Firebase auth check finishes,
+    // to prevent sudden redirects on initial load.
+    if (!authInitialized) {
+        return null; // Or a subtle loading spinner
+    }
 
     return (
-        <AuthContext.Provider value={{ user, login, signup, logout }}>
+        <AuthContext.Provider value={{ user, login, signup, logout, googleLogin }}>
             {children}
         </AuthContext.Provider>
     );

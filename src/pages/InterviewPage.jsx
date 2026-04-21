@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { X, Mic, Play, Loader2 } from 'lucide-react';
+import { X, Mic, Play, Loader2, Sparkles } from 'lucide-react';
 import interviewVideo from '../assets/AI_Job_Interviewer_Video_Generation.mp4';
 import { getQuestionCountFromDuration } from '../utils/questionGenerator';
 import { getAttemptedQuestionIds, setAttemptedQuestionIds, saveInterviewSession, updateInterviewSession } from '../utils/storage';
 import { generateGeminiQuestions } from '../utils/geminiQuestions';
+import { generateFollowUp } from '../services/gemini';
+import { useAuth } from '../context/AuthContext';
 
 const InterviewPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const videoRef = useRef(null);
   const userVideoRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -37,6 +40,12 @@ const InterviewPage = () => {
   const [typedStartTime, setTypedStartTime] = useState(null);
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(true);
   const [questionError, setQuestionError] = useState('');
+
+  // Follow-up Q state
+  const [followUpQuestion, setFollowUpQuestion]   = useState('');
+  const [isGeneratingFollowUp, setIsGeneratingFollowUp] = useState(false);
+  const [followUpAnswer, setFollowUpAnswer]       = useState('');
+  const [showFollowUp, setShowFollowUp]           = useState(false);
 
   const currentQuestion = questions[currentQuestionIndex];
 
@@ -80,8 +89,11 @@ const InterviewPage = () => {
 
       if (!isMounted) return;
       setQuestions(selectedQuestions);
-      setAttemptedQuestionIds(
-        Array.from(new Set([...getAttemptedQuestionIds(), ...selectedQuestions.map((q) => q.questionId)]))
+      
+      const previousIds = await getAttemptedQuestionIds(user?.uid);
+      await setAttemptedQuestionIds(
+        user?.uid,
+        Array.from(new Set([...previousIds, ...selectedQuestions.map((q) => q.questionId)]))
       );
 
       const session = {
@@ -93,7 +105,7 @@ const InterviewPage = () => {
         breakdown
       };
 
-      saveInterviewSession(session);
+      await saveInterviewSession(user?.uid, session);
       setIsGeneratingQuestions(false);
     };
 
@@ -431,11 +443,31 @@ const InterviewPage = () => {
       mediaRecorderRef.current.stop();
     }
 
-    // Save current answer transcript (remove any interim results)
-    if (answer) {
-      persistCurrentAnswer(answer.replace(/undefined/g, ''));
-    }
+    // Save current answer transcript
+    const savedAnswers = answer ? persistCurrentAnswer(answer.replace(/undefined/g, '')) : answers;
     setAnswerStartTime(null);
+
+    // ── Follow-up trigger ──
+    // Trigger if answer is not empty. Gemini service internally decides depth.
+    const trimmedAnswer = answer.trim().replace(/undefined/g, '').trim();
+    if (trimmedAnswer && currentQuestion?.text) {
+      // Quick local checks: SR ~ word overlap ratio (light proxy), ACE ~ word count vs concepts
+      const wordCount = trimmedAnswer.split(/\s+/).length;
+      const conceptCount = currentQuestion.expectedConcepts?.length || 1;
+      const aceProxy = Math.min(1, wordCount / (conceptCount * 30));
+      // Trigger if answer is short/shallow (aceProxy < 0.4) — deeper follow-up always valuable
+      if (aceProxy < 0.4 || wordCount < 60) {
+        setShowFollowUp(false);
+        setFollowUpQuestion('');
+        setFollowUpAnswer('');
+        setIsGeneratingFollowUp(true);
+        generateFollowUp(currentQuestion.text, trimmedAnswer)
+          .then((q) => {
+            if (q) { setFollowUpQuestion(q); setShowFollowUp(true); }
+          })
+          .finally(() => setIsGeneratingFollowUp(false));
+      }
+    }
   };
 
   const handleRetryQuestion = () => {
@@ -493,6 +525,26 @@ const InterviewPage = () => {
       persistCurrentAnswer(answer);
     }
 
+    // Persist follow-up Q&A into the current answer slot
+    if (followUpQuestion) {
+      setAnswers((prev) => {
+        const updated = [...prev];
+        if (updated[currentQuestionIndex]) {
+          updated[currentQuestionIndex] = {
+            ...updated[currentQuestionIndex],
+            followUpQuestion,
+            followUpAnswer
+          };
+        }
+        return updated;
+      });
+    }
+
+    // Reset follow-up state
+    setFollowUpQuestion('');
+    setFollowUpAnswer('');
+    setShowFollowUp(false);
+
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setAnswer(''); // Clear answer for next question
@@ -501,7 +553,7 @@ const InterviewPage = () => {
     }
   };
 
-  const handleFinishInterview = () => {
+  const handleFinishInterview = async () => {
     // Stop recognition if active
     if (recognitionRef.current && isRecording) {
       recognitionRef.current.stop();
@@ -518,7 +570,7 @@ const InterviewPage = () => {
     // Stop all media tracks
     stopAllTracks();
 
-    updateInterviewSession(sessionId, {
+    await updateInterviewSession(user?.uid, sessionId, {
       completedAt: new Date().toISOString(),
       answers: finalAnswers || answers
     });
@@ -712,6 +764,51 @@ const InterviewPage = () => {
             placeholder={isRecording ? 'Listening… Speak your answer' : 'Type or speak your answer here'}
             className="answer-input"
           />
+
+          {/* AI Follow-Up Question */}
+          {!isRecording && (isGeneratingFollowUp || showFollowUp) && (
+            <div style={{
+              marginTop: '1rem',
+              background: 'rgba(139,92,246,0.08)',
+              border: '1px solid rgba(139,92,246,0.25)',
+              borderRadius: '0.875rem',
+              padding: '1rem 1.25rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Sparkles style={{ width: '14px', height: '14px', color: '#a78bfa' }} />
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#a78bfa', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                  AI Follow-Up
+                </span>
+              </div>
+              {isGeneratingFollowUp && (
+                <p style={{ color: '#c4b5fd', fontSize: '0.88rem', opacity: 0.7 }} className="animate-pulse">
+                  Generating follow-up question…
+                </p>
+              )}
+              {showFollowUp && followUpQuestion && (
+                <>
+                  <p style={{ color: '#e9d5ff', fontSize: '0.92rem', lineHeight: 1.55, fontWeight: 500 }}>
+                    {followUpQuestion}
+                  </p>
+                  <textarea
+                    value={followUpAnswer}
+                    onChange={(e) => setFollowUpAnswer(e.target.value)}
+                    placeholder="Answer the follow-up (optional)…"
+                    style={{
+                      width: '100%', padding: '0.75rem 1rem',
+                      background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(139,92,246,0.2)',
+                      borderRadius: '0.625rem', color: '#e5e7eb', fontSize: '0.88rem',
+                      resize: 'vertical', minHeight: '80px', outline: 'none',
+                      fontFamily: 'inherit', boxSizing: 'border-box'
+                    }}
+                  />
+                </>
+              )}
+            </div>
+          )}
 
           {/* Action Row inside container: Start/Stop Answer aligned center */}
           <div className="flex justify-center mt-6">

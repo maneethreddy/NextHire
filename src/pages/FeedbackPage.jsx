@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, AlertTriangle, FileText, BookmarkX } from 'lucide-react';
 import { evaluateInterview } from '../utils/evaluation';
+import { generatePDF } from '../utils/pdf';
+import { updateInterviewSession } from '../utils/storage';
+import { useAuth } from '../context/AuthContext';
+import BookmarkToggle from '../components/BookmarkToggle';
 import Logo from '../assets/Logo.png';
 
 // ─────────────────────────────────────────────────
@@ -167,7 +171,8 @@ const IndexLegend = ({ indexKey, value }) => {
 const FeedbackPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { config, answers, questions } = location.state || {};
+  const { user } = useAuth();
+  const { config, answers, questions, sessionId } = location.state || {};
   const [evaluation, setEvaluation] = useState(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evaluationError, setEvaluationError] = useState(null);
@@ -180,7 +185,20 @@ const FeedbackPage = () => {
       setEvaluationError(null);
       try {
         const result = await evaluateInterview({ questions, answers, resumeData: config?.resumeData, config });
-        if (isActive) setEvaluation(result);
+        if (isActive) {
+          setEvaluation(result);
+
+          // ── Enrich the stored session with scores + results ──
+          if (sessionId && user?.uid) {
+            await updateInterviewSession(user.uid, sessionId, {
+              overallScore:    result.overallScore,
+              questionResults: result.questionResults,
+              sessionIndices:  result.sessionIndices,
+              answers,
+              summary:         result.summary
+            });
+          }
+        }
       } catch (err) {
         if (isActive) setEvaluationError(err);
       } finally {
@@ -189,7 +207,7 @@ const FeedbackPage = () => {
     };
     runEvaluation();
     return () => { isActive = false; };
-  }, [questions, answers, config]);
+  }, [questions, answers, config, sessionId, user]);
 
   const overallScore = evaluation?.overallScore || 0;
   const si = evaluation?.sessionIndices || {};
@@ -290,12 +308,20 @@ const FeedbackPage = () => {
                   const isFair = label === 'Fair' || label.toLowerCase().includes('partial');
                   const pillCls = isGood ? 'pill-green' : isFair ? 'pill-yellow' : 'pill-red';
                   const qi = result?.indices || {};
+                  const score100 = result?.score10 != null ? result.score10 * 10 : (result?.weightedScore ?? 0);
 
                   return (
                     <div key={question.questionId} className="bg-black/30 rounded-2xl p-6 border border-white/10">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="font-semibold">Question {index + 1}</h3>
-                        <span className={`score-pill ${pillCls}`}>{label}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <BookmarkToggle
+                            questionId={question.questionId}
+                            questionText={question.text}
+                            score={Math.round(score100)}
+                          />
+                          <span className={`score-pill ${pillCls}`}>{label}</span>
+                        </div>
                       </div>
                       <p className="text-gray-300 mb-4">{question.text}</p>
 
@@ -347,36 +373,59 @@ const FeedbackPage = () => {
             </div>
           )}
 
-          {/* Recommendations */}
-          <div className="bg-black/30 rounded-2xl p-8 border border-white/10">
-            <h2 className="text-2xl font-semibold mb-6">Recommendations</h2>
-            <div className="space-y-4">
-              {evaluation?.summary?.missingConcepts?.length ? (
-                evaluation.summary.missingConcepts.map((rec, i) => (
-                  <div key={i} className="flex items-start gap-3 p-4 bg-black/20 rounded-xl">
-                    <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-                    <span>Review: {rec}</span>
-                  </div>
-                ))
-              ) : (
-                <div className="flex items-start gap-3 p-4 bg-black/20 rounded-xl">
-                  <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-                  <span>Keep practising to improve coverage and depth.</span>
-                </div>
-              )}
-              <div className="evaluation-disclaimer">
-                Scores use Gemini text-embedding-004 for semantic similarity and NextHire research indices (CLT, TAI, ACE, EDD, IRI).
-                Experience-level adjustment is applied. Falls back to deterministic scoring if Gemini is unavailable.
-              </div>
-            </div>
-          </div>
+
 
           {/* Action Buttons */}
-          <div className="flex gap-4 mt-8">
-            <button onClick={() => navigate('/configure')} className="flex-1 py-4 bg-gradient-to-r from-red-500 to-pink-500 rounded-xl font-semibold hover:opacity-90 transition-opacity">
+          <div className="flex gap-4 mt-8" style={{ flexWrap: 'wrap' }}>
+            {/* Download PDF */}
+            {evaluation && (
+              <button
+                onClick={() => generatePDF({
+                  role:            config?.jobPosition || 'Interview',
+                  date:            new Date().toISOString(),
+                  overallScore:    evaluation.overallScore,
+                  sessionIndices:  evaluation.sessionIndices,
+                  questionResults: evaluation.questionResults,
+                  questions,
+                  answers,
+                  summary:         evaluation.summary
+                })}
+                style={{
+                  flex: 1, minWidth: '180px', padding: '1rem',
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: '0.75rem', color: '#e5e7eb', fontWeight: 600, fontSize: '0.95rem',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                  transition: 'background 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.12)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+              >
+                <FileText style={{ width: '18px', height: '18px' }} />
+                Download Report
+              </button>
+            )}
+
+            {/* Practice Weak Areas */}
+            <button
+              onClick={() => navigate('/practice')}
+              style={{
+                flex: 1, minWidth: '180px', padding: '1rem',
+                background: 'rgba(250,204,21,0.1)', border: '1px solid rgba(250,204,21,0.3)',
+                borderRadius: '0.75rem', color: '#facc15', fontWeight: 600, fontSize: '0.95rem',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                transition: 'background 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(250,204,21,0.18)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(250,204,21,0.1)'}
+            >
+              <BookmarkX style={{ width: '18px', height: '18px' }} />
+              Practice Weak Areas
+            </button>
+
+            <button onClick={() => navigate('/configure')} className="flex-1 py-4 bg-gradient-to-r from-red-500 to-pink-500 rounded-xl font-semibold hover:opacity-90 transition-opacity" style={{ minWidth: '140px' }}>
               Practice Again
             </button>
-            <button onClick={() => navigate('/')} className="flex-1 py-4 bg-white/5 border border-white/10 rounded-xl font-semibold hover:bg-white/10 transition-colors">
+            <button onClick={() => navigate('/')} className="flex-1 py-4 bg-white/5 border border-white/10 rounded-xl font-semibold hover:bg-white/10 transition-colors" style={{ minWidth: '140px' }}>
               Back to Home
             </button>
           </div>

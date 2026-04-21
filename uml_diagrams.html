@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NextHire — UML Architecture Diagrams</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3/dist/jszip.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0f0f1a;
+            color: #e0e0e8;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .hero {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            padding: 60px 24px 48px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .hero h1 {
+            font-size: 2.6rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #e94560, #f5a623, #e94560);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shimmer 3s linear infinite;
+        }
+
+        @keyframes shimmer {
+            to {
+                background-position: 200% center;
+            }
+        }
+
+        .hero p {
+            margin-top: 12px;
+            font-size: 1.05rem;
+            color: #9ca3af;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .hero .btn-all {
+            margin-top: 28px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 28px;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: linear-gradient(135deg, #e94560, #c0392b);
+            color: #fff;
+            transition: transform .2s, box-shadow .2s;
+        }
+
+        .hero .btn-all:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(233, 69, 96, .35);
+        }
+
+        /* Grid */
+        .grid {
+            max-width: 1280px;
+            margin: 48px auto;
+            padding: 0 24px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 36px;
+        }
+
+        /* Card */
+        .card {
+            background: #1a1a2e;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 16px;
+            overflow: hidden;
+            transition: border-color .3s;
+        }
+
+        .card:hover {
+            border-color: rgba(233, 69, 96, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 28px;
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .card-header h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #f0f0f5;
+        }
+
+        .badge {
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: rgba(233, 69, 96, 0.15);
+            color: #e94560;
+        }
+
+        .card-body {
+            padding: 28px;
+            display: flex;
+            justify-content: center;
+            overflow-x: auto;
+            background: #fff;
+            min-height: 320px;
+        }
+
+        .card-body .mermaid {
+            width: 100%;
+        }
+
+        .card-footer {
+            display: flex;
+            gap: 12px;
+            padding: 16px 28px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .btn-download {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 9px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform .2s, box-shadow .2s;
+        }
+
+        .btn-download.svg-btn {
+            background: rgba(233, 69, 96, 0.12);
+            color: #e94560;
+        }
+
+        .btn-download.png-btn {
+            background: rgba(245, 166, 35, 0.12);
+            color: #f5a623;
+        }
+
+        .btn-download:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, .3);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 32px 24px;
+            font-size: 0.82rem;
+            color: #555;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        @media(min-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Hero -->
+    <header class="hero">
+        <h1>NextHire — UML Diagrams</h1>
+        <p>All architecture diagrams for the NextHire AI Interview Platform. Click download to save any diagram as SVG
+            or PNG.</p>
+        <button class="btn-all" onclick="downloadAllPNG()">⬇ Download All as PNG</button>
+    </header>
+
+    <!-- Diagram Cards -->
+    <main class="grid">
+
+        <!-- 1. Use Case Diagram -->
+        <div class="card" id="card-usecase">
+            <div class="card-header">
+                <h2>Use Case Diagram</h2>
+                <span class="badge">Behavioral</span>
+            </div>
+            <div class="card-body">
+                <pre class="mermaid">
+graph TD
+    subgraph "👤 Actors"
+        Candidate["🎓 Candidate"]
+        Admin["🛡️ System Admin"]
+    end
+
+    subgraph "NextHire AI System"
+        UC1["📄 Upload Resume"]
+        UC2["🤖 Parse Resume via AI"]
+        UC3["❓ Generate Questions via Gemini API"]
+        UC4["🎥 Conduct Video Interview"]
+        UC5["📝 Evaluate Responses"]
+        UC6["⚙️ Manage AI Prompts"]
+        UC7["📊 View Feedback & Score"]
+        UC8["🔐 Authenticate / Login"]
+    end
+
+    Candidate --> UC8
+    Candidate --> UC1
+    Candidate --> UC4
+    Candidate --> UC7
+
+    UC1 -.->|include| UC2
+    UC2 -.->|include| UC3
+    UC4 -.->|include| UC5
+    UC5 -.->|include| UC7
+
+    Admin --> UC6
+    Admin --> UC8
+        </pre>
+            </div>
+            <div class="card-footer">
+                <button class="btn-download svg-btn" onclick="downloadSVG('card-usecase','UseCase_Diagram')">⬇
+                    SVG</button>
+                <button class="btn-download png-btn" onclick="downloadPNG('card-usecase','UseCase_Diagram')">⬇
+                    PNG</button>
+            </div>
+        </div>
+
+        <!-- 2. Class Diagram -->
+        <div class="card" id="card-class">
+            <div class="card-header">
+                <h2>Class Diagram</h2>
+                <span class="badge">Structural</span>
+            </div>
+            <div class="card-body">
+                <pre class="mermaid">
+classDiagram
+    class User {
+        +String userId
+        +String name
+        +String email
+        +String role
+        +login()
+        +logout()
+        +getProfile()
+    }
+
+    class Candidate {
+        +String resumeUrl
+        +String targetRole
+        +int yearsExperience
+        +uploadResume()
+        +startInterview()
+        +viewFeedback()
+    }
+
+    class InterviewSession {
+        +String sessionId
+        +Date startTime
+        +Date endTime
+        +String status
+        +int totalScore
+        +startSession()
+        +endSession()
+        +saveSession()
+    }
+
+    class Question {
+        +String questionId
+        +String text
+        +String type
+        +String difficulty
+        +String expectedKeywords
+        +String category
+    }
+
+    class AIEngine {
+        +String apiKey
+        +String apiVersion
+        +String modelName
+        +generateQuestions(resumeText)
+        +evaluateAnswer(answerText, expectedKeywords)
+        +generateFeedback(sessionData)
+    }
+
+    class ResumeParser {
+        +String parserId
+        +extractText(pdfFile)
+        +identifySkills(text)
+        +identifyExperience(text)
+    }
+
+    class Feedback {
+        +String feedbackId
+        +float score
+        +String summary
+        +String strengths
+        +String improvements
+    }
+
+    User <|-- Candidate
+    Candidate "1" -- "many" InterviewSession : conducts
+    InterviewSession "1" *-- "many" Question : contains
+    InterviewSession "1" *-- "1" Feedback : generates
+    InterviewSession ..> AIEngine : uses
+    Candidate ..> ResumeParser : uses
+    AIEngine ..> Feedback : produces
+        </pre>
+            </div>
+            <div class="card-footer">
+                <button class="btn-download svg-btn" onclick="downloadSVG('card-class','Class_Diagram')">⬇ SVG</button>
+                <button class="btn-download png-btn" onclick="downloadPNG('card-class','Class_Diagram')">⬇ PNG</button>
+            </div>
+        </div>
+
+        <!-- 3. DFD Level-0 & Level-1 -->
+        <div class="card" id="card-dfd">
+            <div class="card-header">
+                <h2>Data Flow Diagram (DFD)</h2>
+                <span class="badge">Data</span>
+            </div>
+            <div class="card-body">
+                <pre class="mermaid">
+graph TD
+    User(["🎓 Candidate"]) -- "Uploads Resume PDF" --> P1(("1.0 Resume Parser"))
+    P1 -- "Extracted Text & Skills" --> DS1[("DS1: Resume Store")]
+    DS1 -- "Resume Data" --> P2(("2.0 AI Question Generator"))
+    P2 -- "Prompt + Context" --> ExtAI["🤖 Gemini AI API"]
+    ExtAI -- "Generated Questions JSON" --> P2
+    P2 -- "Structured Questions" --> DS2[("DS2: Question Bank")]
+
+    DS2 -- "Interview Questions" --> P3(("3.0 Interview Engine"))
+    User -- "Answers via Video/Audio" --> P3
+    P3 -- "Recorded Responses" --> DS3[("DS3: Media Storage")]
+    P3 -- "Answer Transcripts" --> P4(("4.0 AI Evaluator"))
+    P4 -- "Evaluation Prompt" --> ExtAI2["🤖 Gemini AI API"]
+    ExtAI2 -- "Scores & Feedback" --> P4
+    P4 -- "Final Report" --> DS4[("DS4: Feedback Store")]
+    DS4 -- "Feedback & Score" --> User
+        </pre>
+            </div>
+            <div class="card-footer">
+                <button class="btn-download svg-btn" onclick="downloadSVG('card-dfd','DFD_Diagram')">⬇ SVG</button>
+                <button class="btn-download png-btn" onclick="downloadPNG('card-dfd','DFD_Diagram')">⬇ PNG</button>
+            </div>
+        </div>
+
+        <!-- 4. Component Diagram -->
+        <div class="card" id="card-component">
+            <div class="card-header">
+                <h2>Component Diagram</h2>
+                <span class="badge">Structural</span>
+            </div>
+            <div class="card-body">
+                <pre class="mermaid">
+graph TB
+    subgraph "Client Tier"
+        WebApp["⚛️ React + Vite Web App"]
+    end
+
+    subgraph "API Gateway Tier"
+        APIGW["🌐 Serverless API Gateway"]
+    end
+
+    subgraph "Serverless Compute Tier"
+        F1["λ Resume Parsing Function"]
+        F2["λ Question Generation Function"]
+        F3["λ Video Processing Function"]
+        F4["λ Evaluation Function"]
+        F5["λ Auth Function"]
+    end
+
+    subgraph "Data Tier"
+        DB[("🗄️ NoSQL Database")]
+        Bucket["☁️ Cloud Storage Bucket"]
+    end
+
+    subgraph "External AI Services"
+        Gemini["🤖 Google Gemini AI"]
+    end
+
+    WebApp -->|"HTTPS / REST"| APIGW
+    APIGW -->|"/api/upload"| F1
+    APIGW -->|"/api/generate"| F2
+    APIGW -->|"/api/video"| F3
+    APIGW -->|"/api/evaluate"| F4
+    APIGW -->|"/api/auth"| F5
+
+    F1 -->|"Store PDF"| Bucket
+    F1 -->|"Save metadata"| DB
+    F2 -->|"AI Prompt"| Gemini
+    F2 -->|"Save Questions"| DB
+    F3 -->|"Save Recording"| Bucket
+    F4 -->|"AI Evaluation"| Gemini
+    F4 -->|"Save Results"| DB
+        </pre>
+            </div>
+            <div class="card-footer">
+                <button class="btn-download svg-btn" onclick="downloadSVG('card-component','Component_Diagram')">⬇
+                    SVG</button>
+                <button class="btn-download png-btn" onclick="downloadPNG('card-component','Component_Diagram')">⬇
+                    PNG</button>
+            </div>
+        </div>
+
+        <!-- 5. Sequence Diagram -->
+        <div class="card" id="card-sequence">
+            <div class="card-header">
+                <h2>Sequence Diagram</h2>
+                <span class="badge">Behavioral</span>
+            </div>
+            <div class="card-body">
+                <pre class="mermaid">
+sequenceDiagram
+    actor Candidate
+    participant WebUI as Frontend (React)
+    participant Auth as Auth Service
+    participant API as API Gateway / Lambda
+    participant Storage as Cloud Storage
+    participant Gemini as Gemini AI Service
+    participant DB as NoSQL Database
+
+    Candidate->>WebUI: Open NextHire & Login
+    WebUI->>Auth: Authenticate (JWT)
+    Auth-->>WebUI: Token Valid ✅
+
+    Candidate->>WebUI: Upload Resume PDF
+    WebUI->>API: POST /api/upload (PDF file)
+    activate API
+    API->>Storage: Store Resume PDF
+    Storage-->>API: File URL
+    API->>API: Extract text from PDF
+    API->>Gemini: POST generate_content (resume text + prompt)
+    activate Gemini
+    Gemini-->>API: Generated Questions JSON
+    deactivate Gemini
+    API->>DB: Save questions to database
+    API-->>WebUI: 200 OK + Questions
+    deactivate API
+    WebUI-->>Candidate: Display Interview Questions
+
+    Candidate->>WebUI: Start Video Interview
+    WebUI->>API: GET /api/signed-url
+    API-->>WebUI: Pre-signed Upload URL
+    Note over Candidate, WebUI: Interview in progress...
+    Candidate->>WebUI: Submit Answer (Video)
+    WebUI->>Storage: Upload video via signed URL
+    Storage-->>WebUI: Upload Complete
+
+    WebUI->>API: POST /api/evaluate (transcript)
+    activate API
+    API->>Gemini: Evaluate answer
+    Gemini-->>API: Score + Feedback
+    API->>DB: Save evaluation
+    API-->>WebUI: Feedback JSON
+    deactivate API
+    WebUI-->>Candidate: Show Score & Feedback
+        </pre>
+            </div>
+            <div class="card-footer">
+                <button class="btn-download svg-btn" onclick="downloadSVG('card-sequence','Sequence_Diagram')">⬇
+                    SVG</button>
+                <button class="btn-download png-btn" onclick="downloadPNG('card-sequence','Sequence_Diagram')">⬇
+                    PNG</button>
+            </div>
+        </div>
+
+        <!-- 6. Deployment Diagram -->
+        <div class="card" id="card-deployment">
+            <div class="card-header">
+                <h2>Deployment Diagram</h2>
+                <span class="badge">Infrastructure</span>
+            </div>
+            <div class="card-body">
+                <pre class="mermaid">
+graph TB
+    subgraph "Candidate Device"
+        Browser["🌐 Web Browser"]
+        ReactBuild["Vite / React SPA Build"]
+        Browser --- ReactBuild
+    end
+
+    subgraph "Cloud Provider (AWS / GCP)"
+        subgraph "Edge Network"
+            CDN["🌍 CDN (CloudFront / Vercel)"]
+        end
+        subgraph "Compute Layer"
+            Gateway["API Gateway"]
+            Lambda1["λ Node.js Runtime"]
+            Lambda2["λ Python Runtime"]
+        end
+        subgraph "Storage Layer"
+            DynamoDB[("DynamoDB / Firestore")]
+            S3["S3 / GCS Bucket"]
+        end
+    end
+
+    subgraph "External AI Provider"
+        GeminiAPI["🤖 Gemini API Endpoint"]
+    end
+
+    Browser ==>|"HTTPS"| CDN
+    Browser ==>|"HTTPS / REST"| Gateway
+    Gateway -->|"Trigger"| Lambda1
+    Gateway -->|"Trigger"| Lambda2
+    Lambda1 -->|"Read/Write"| DynamoDB
+    Lambda1 -->|"Upload/Download"| S3
+    Lambda2 -->|"AI Inference"| GeminiAPI
+        </pre>
+            </div>
+            <div class="card-footer">
+                <button class="btn-download svg-btn" onclick="downloadSVG('card-deployment','Deployment_Diagram')">⬇
+                    SVG</button>
+                <button class="btn-download png-btn" onclick="downloadPNG('card-deployment','Deployment_Diagram')">⬇
+                    PNG</button>
+            </div>
+        </div>
+
+        <!-- 7. Activity Diagram -->
+        <div class="card" id="card-activity">
+            <div class="card-header">
+                <h2>Activity Diagram</h2>
+                <span class="badge">Behavioral</span>
+            </div>
+            <div class="card-body">
+                <pre class="mermaid">
+graph TD
+    Start(["▶ Start"]) --> A1["Candidate Opens NextHire"]
+    A1 --> A2{"Authenticated?"}
+    A2 -->|No| A3["Login / Sign Up"]
+    A3 --> A2
+    A2 -->|Yes| A4["Navigate to Configure Interview"]
+    A4 --> A5["Upload Resume PDF"]
+    A5 --> A6["Resume Parser Extracts Text"]
+    A6 --> A7["AI Engine Identifies Skills & Experience"]
+    A7 --> A8["Construct Prompt for Gemini API"]
+    A8 --> A9["Gemini API Generates Questions"]
+    A9 --> A10{"Questions Generated Successfully?"}
+    A10 -->|No| A11["Retry with Fallback Model"]
+    A11 --> A9
+    A10 -->|Yes| A12["Display Questions to Candidate"]
+    A12 --> A13["Candidate Starts Video Interview"]
+    A13 --> A14["AI Asks Question via Video"]
+    A14 --> A15["Candidate Records Video Answer"]
+    A15 --> A16["Upload Video to Cloud Storage"]
+    A16 --> A17["Transcribe Answer"]
+    A17 --> A18{"More Questions?"}
+    A18 -->|Yes| A14
+    A18 -->|No| A19["Submit All Answers for Evaluation"]
+    A19 --> A20["AI Evaluator Scores Responses"]
+    A20 --> A21["Generate Feedback Summary"]
+    A21 --> A22["Display Score & Feedback to Candidate"]
+    A22 --> A23{"Retry Interview?"}
+    A23 -->|Yes| A13
+    A23 -->|No| End(["⏹ End"])
+        </pre>
+            </div>
+            <div class="card-footer">
+                <button class="btn-download svg-btn" onclick="downloadSVG('card-activity','Activity_Diagram')">⬇
+                    SVG</button>
+                <button class="btn-download png-btn" onclick="downloadPNG('card-activity','Activity_Diagram')">⬇
+                    PNG</button>
+            </div>
+        </div>
+
+        <!-- 8. State Machine Diagram -->
+        <div class="card" id="card-state">
+            <div class="card-header">
+                <h2>State Machine Diagram</h2>
+                <span class="badge">Behavioral</span>
+            </div>
+            <div class="card-body">
+                <pre class="mermaid">
+stateDiagram-v2
+    [*] --> Idle
+
+    Idle --> Authenticating : User opens app
+    Authenticating --> Authenticated : Login success
+    Authenticating --> Idle : Login failed
+
+    Authenticated --> ResumeUploading : Upload resume
+    ResumeUploading --> ResumeParsing : File stored
+    ResumeParsing --> QuestionGeneration : Text extracted
+
+    QuestionGeneration --> QuestionsReady : Gemini API returns questions
+    QuestionGeneration --> GenerationFailed : API error / timeout
+    GenerationFailed --> QuestionGeneration : Retry with fallback model
+
+    QuestionsReady --> InterviewInProgress : Start interview
+
+    state InterviewInProgress {
+        [*] --> AskingQuestion
+        AskingQuestion --> RecordingAnswer : AI video plays question
+        RecordingAnswer --> UploadingVideo : Candidate finishes answer
+        UploadingVideo --> TranscribingAnswer : Video uploaded
+        TranscribingAnswer --> AskingQuestion : Next question
+        TranscribingAnswer --> AllAnswered : No more questions
+    }
+
+    InterviewInProgress --> Evaluating : All questions answered
+    AllAnswered --> Evaluating
+
+    Evaluating --> FeedbackReady : AI scores and generates feedback
+    FeedbackReady --> InterviewInProgress : Retry interview
+    FeedbackReady --> SessionComplete : User exits
+
+    SessionComplete --> Authenticated : Start new session
+    SessionComplete --> [*] : Logout
+        </pre>
+            </div>
+            <div class="card-footer">
+                <button class="btn-download svg-btn" onclick="downloadSVG('card-state','StateMachine_Diagram')">⬇
+                    SVG</button>
+                <button class="btn-download png-btn" onclick="downloadPNG('card-state','StateMachine_Diagram')">⬇
+                    PNG</button>
+            </div>
+        </div>
+
+    </main>
+
+    <footer>NextHire Architecture Diagrams — Generated for academic submission</footer>
+
+    <script>
+        // Initialize Mermaid
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                fontSize: '14px',
+            },
+            flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
+            sequence: { useMaxWidth: true, showSequenceNumbers: false, actorMargin: 60 },
+        });
+
+        // Helper: get the rendered SVG element inside a card
+        function getSVGFromCard(cardId) {
+            const card = document.getElementById(cardId);
+            return card.querySelector('.card-body svg');
+        }
+
+        // Download as SVG
+        function downloadSVG(cardId, filename) {
+            const svg = getSVGFromCard(cardId);
+            if (!svg) { alert('Diagram not rendered yet. Please wait.'); return; }
+            const clone = svg.cloneNode(true);
+            clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            // Ensure white background
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('width', '100%');
+            rect.setAttribute('height', '100%');
+            rect.setAttribute('fill', '#ffffff');
+            clone.insertBefore(rect, clone.firstChild);
+            const blob = new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml' });
+            triggerDownload(blob, filename + '.svg');
+        }
+
+        // Convert an SVG element to a PNG blob (returns a Promise)
+        function svgToPngBlob(svgElement, scale) {
+            return new Promise((resolve, reject) => {
+                const clone = svgElement.cloneNode(true);
+                clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+
+                // Ensure explicit width/height so the <img> has intrinsic dimensions
+                const bbox = svgElement.getBoundingClientRect();
+                const w = bbox.width || svgElement.viewBox?.baseVal?.width || 800;
+                const h = bbox.height || svgElement.viewBox?.baseVal?.height || 600;
+                clone.setAttribute('width', w);
+                clone.setAttribute('height', h);
+
+                // White background rect
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('width', '100%');
+                rect.setAttribute('height', '100%');
+                rect.setAttribute('fill', '#ffffff');
+                clone.insertBefore(rect, clone.firstChild);
+
+
+                const svgData = new XMLSerializer().serializeToString(clone);
+                // Use base64 data URI to avoid canvas taint from file:// protocol
+                const base64 = btoa(unescape(encodeURIComponent(svgData)));
+                const dataUrl = 'data:image/svg+xml;base64,' + base64;
+
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w * scale;
+                    canvas.height = h * scale;
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.scale(scale, scale);
+                    ctx.drawImage(img, 0, 0, w, h);
+                    canvas.toBlob(blob => {
+                        if (blob) {
+                            resolve(blob);
+                        } else {
+                            reject(new Error('canvas.toBlob returned null'));
+                        }
+                    }, 'image/png');
+                };
+                img.onerror = () => reject(new Error('Failed to load SVG as image'));
+                img.src = dataUrl;
+            });
+        }
+
+        // Download a single diagram as PNG
+        function downloadPNG(cardId, filename) {
+            const svg = getSVGFromCard(cardId);
+            if (!svg) { alert('Diagram not rendered yet. Please wait.'); return; }
+            svgToPngBlob(svg, 3).then(blob => triggerDownload(blob, filename + '.png'));
+        }
+
+        // Download ALL diagrams as a single ZIP file
+        async function downloadAllPNG() {
+            const btn = document.querySelector('.btn-all');
+            btn.textContent = '⏳ Generating ZIP...';
+            btn.disabled = true;
+
+            const cards = [
+                ['card-usecase', 'UseCase_Diagram'],
+                ['card-class', 'Class_Diagram'],
+                ['card-dfd', 'DFD_Diagram'],
+                ['card-component', 'Component_Diagram'],
+                ['card-sequence', 'Sequence_Diagram'],
+                ['card-deployment', 'Deployment_Diagram'],
+                ['card-activity', 'Activity_Diagram'],
+                ['card-state', 'StateMachine_Diagram'],
+            ];
+
+            try {
+                const zip = new JSZip();
+                for (const [id, name] of cards) {
+                    const svg = getSVGFromCard(id);
+                    if (svg) {
+                        const pngBlob = await svgToPngBlob(svg, 3);
+                        zip.file(name + '.png', pngBlob);
+                    }
+                }
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                triggerDownload(zipBlob, 'NextHire_UML_Diagrams.zip');
+            } catch (e) {
+                alert('Error creating ZIP: ' + e.message);
+            } finally {
+                btn.textContent = '⬇ Download All as PNG (ZIP)';
+                btn.disabled = false;
+            }
+        }
+
+        // Trigger browser download
+        function triggerDownload(blob, filename) {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(a.href), 100);
+        }
+    </script>
+</body>
+
+</html>

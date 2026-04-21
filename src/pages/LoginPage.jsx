@@ -6,9 +6,9 @@ import '../styles/LoginPage.css';
 
 export default function LoginPage() {
     const navigate = useNavigate();
-    const { user, login } = useAuth();
-    const [email, setEmail] = useState('test123@gmail.com');
-    const [password, setPassword] = useState('test123');
+    const { user, login, googleLogin } = useAuth();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [focusedField, setFocusedField] = useState(null);
@@ -55,6 +55,17 @@ export default function LoginPage() {
         }
     };
 
+    const handleGoogleAuth = async () => {
+        setIsLoading(true);
+        setError('');
+        await new Promise((res) => setTimeout(res, 700));
+        const result = googleLogin();
+        setIsLoading(false);
+        if (result.ok) {
+            navigate('/', { replace: true });
+        }
+    };
+
     return (
         <div className="login-root">
             {/* Animated background orbs */}
@@ -98,14 +109,10 @@ export default function LoginPage() {
                 </div>
 
                 {/* Social login */}
-                <div className="login-social-row">
-                    <button className="login-social-btn" type="button" aria-label="Sign in with Google">
+                <div className="login-social-row" style={{ gridTemplateColumns: '1fr' }}>
+                    <button className="login-social-btn" type="button" aria-label="Sign in with Google" onClick={handleGoogleAuth} disabled={isLoading}>
                         <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M5.27 9.76A7.08 7.08 0 0 1 12 4.9c1.69 0 3.22.6 4.41 1.57L19.9 3A11.8 11.8 0 0 0 12 .1 11.94 11.94 0 0 0 1.36 7.09l3.91 2.67z" /><path fill="#34A853" d="M16.04 18.01A7.13 7.13 0 0 1 12 19.1a7.08 7.08 0 0 1-6.72-4.82L1.3 17.01A11.95 11.95 0 0 0 12 24.1c2.93 0 5.68-1.05 7.76-2.78l-3.72-3.31z" /><path fill="#FBBC05" d="M5.28 14.28A7 7 0 0 1 4.9 12c0-.8.14-1.56.38-2.28L1.36 7.09A11.9 11.9 0 0 0 .1 12c0 1.73.37 3.37 1.02 4.85l4.16-2.57z" /><path fill="#4285F4" d="M23.9 12c0-.84-.08-1.65-.22-2.43H12v4.8h6.66a5.7 5.7 0 0 1-2.5 3.6l3.72 3.31C21.83 19.28 23.9 15.93 23.9 12z" /></svg>
-                        <span>Google</span>
-                    </button>
-                    <button className="login-social-btn" type="button" aria-label="Sign in with GitHub">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.79 23.4c.6.1.82-.26.82-.58v-2.25c-3.34.72-4.04-1.41-4.04-1.41-.55-1.39-1.34-1.76-1.34-1.76-1.09-.74.08-.72.08-.72 1.2.08 1.84 1.23 1.84 1.23 1.07 1.83 2.8 1.3 3.49 1 .1-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.11-3.17 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.66 1.65.25 2.87.12 3.17.77.84 1.23 1.91 1.23 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.21.7.82.58A12 12 0 0 0 12 .3z" /></svg>
-                        <span>GitHub</span>
+                        <span>Continue with Google</span>
                     </button>
                 </div>
 

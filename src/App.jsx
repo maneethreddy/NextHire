@@ -5,6 +5,9 @@ import InterviewPage from './pages/InterviewPage';
 import FeedbackPage from './pages/FeedbackPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import HistoryPage from './pages/HistoryPage';
+import ReviewPage from './pages/ReviewPage';
+import PracticePage from './pages/PracticePage';
 
 function App() {
   return (
@@ -16,6 +19,9 @@ function App() {
         <Route path="/configure" element={<ConfigurePage />} />
         <Route path="/interview" element={<InterviewPage />} />
         <Route path="/feedback" element={<FeedbackPage />} />
+        <Route path="/history" element={<HistoryPage />} />
+        <Route path="/review/:sessionId" element={<ReviewPage />} />
+        <Route path="/practice" element={<PracticePage />} />
       </Routes>
     </Router>
   );
